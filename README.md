@@ -134,10 +134,12 @@ To redo one asset, delete its file (for example `images\004.png`) and run `--res
 
 ---
 
-# Part 2: Deploy the website on Render
+# Part 2: Deploy the website on Render (free)
 
-You need four free accounts: **GitHub**, **Supabase**, **Render** and (for Google sign-in) **Google Cloud**.
-Render's background worker is the only paid part (Starter plan, about $7/month). Everything else here is on free plans.
+The **website** and the **job queue** run on Render's free plans; **Supabase** (database, sign-in, files) is free too.
+The **video worker runs on your own PC** (`pnpm worker`): it picks up videos people start on the website.
+Videos are only made while your PC is on and the worker is running; jobs simply wait in the queue until then.
+When you want it running 24/7, move the worker to Render (Starter plan, about $7/month; see the end of `render.yaml`).
 
 ## Step 1: Put the code on GitHub
 
@@ -146,57 +148,69 @@ Render deploys from a GitHub repository. From `C:\dev\Inkcut` in PowerShell (one
 ```powershell
 git init
 git add -A
+git status          # .env and out\ must NOT be listed
 git commit -m "Inkcut"
 git branch -M main
 git remote add origin https://github.com/softalpha0/Inkcut.git
 git push -u origin main
 ```
 
-(`.env` is git-ignored, so your keys are not uploaded. Check with `git status` before pushing.)
-
 ## Step 2: Supabase (database, sign-in, file storage)
 
-1. Create a project at supabase.com. Choose the region closest to Render's (e.g. **US West** for Render's Oregon).
-2. **SQL Editor → New query**: paste all of `packages/db/migrations/0001_init.sql` and click **Run**. It creates the tables,
-   security rules, daily-limit function, the three private storage buckets and realtime.
-3. **Project Settings → API**: copy the **Project URL**, the **anon public** key and the **service_role** key
-   (the service_role key is secret: it goes only into Render, never into the browser or git).
-4. **Authentication → URL Configuration**:
-   - Site URL: `https://inkcut-web.onrender.com` (your Render URL; you can update it after Step 3)
-   - Redirect URLs: add `https://inkcut-web.onrender.com/auth/callback` and `http://localhost:3000/auth/callback`
-5. **Authentication → Providers**: Email is on by default (magic links). For **Google**: create an OAuth client in
-   Google Cloud Console (APIs & Services → Credentials → OAuth client ID → Web application), add the redirect URI
-   Supabase shows on the Google provider page, then paste the Client ID and Secret into Supabase.
+1. Create a project at supabase.com (pick a region close to Render's Oregon, e.g. **US West**).
+2. **SQL Editor**: paste the _contents_ of `packages/db/migrations/0001_init.sql`
+   (`Get-Content packages\db\migrations\0001_init.sql -Raw | Set-Clipboard`) and click **Run**.
+3. **Project Settings → API**: copy the **Project URL**, the **anon** key and the **service_role** key (secret).
+4. **Authentication → URL Configuration** (after Step 3, when you know your Render address):
+   - Site URL: `https://inkcut-web.onrender.com`
+   - Redirect URLs: `https://inkcut-web.onrender.com/auth/callback` and `http://localhost:3000/auth/callback`
+5. **Authentication → Providers**: email links work out of the box. Google is optional (needs a Google Cloud OAuth client).
 
-## Step 3: Render Blueprint (web + worker + queue)
+## Step 3: Render Blueprint (website + queue)
 
-1. render.com → **New → Blueprint** → connect GitHub → choose `softalpha0/Inkcut`. Render reads `render.yaml`.
-2. It asks for the secret values (`sync: false`):
+1. render.com → **New → Blueprint** → connect GitHub → choose `softalpha0/Inkcut`. Both services are on free plans.
+2. Fill in the values it asks for:
 
-| Variable                        | Service      | Value                                                            |
-| ------------------------------- | ------------ | ---------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | web          | Supabase Project URL                                             |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | web          | Supabase anon key                                                |
-| `SUPABASE_SERVICE_ROLE_KEY`     | web + worker | Supabase service_role key                                        |
-| `NEXT_PUBLIC_SITE_URL`          | web          | `https://inkcut-web.onrender.com`                                |
-| `ADMIN_EMAILS`                  | web          | your email (lets only you use paid animation)                    |
-| `SUPABASE_URL`                  | worker       | Supabase Project URL                                             |
-| `SERV_API_KEY`                  | worker       | your SERV key                                                    |
-| `POLLINATIONS_API_KEY`          | worker       | your `sk_` key (image + video permission, with a budget)         |
-| `STT_API_KEY`                   | worker       | OpenAI key for voiceover uploads (leave empty to skip that mode) |
+| Variable                        | Value                                        |
+| ------------------------------- | -------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Supabase Project URL                         |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key                            |
+| `SUPABASE_SERVICE_ROLE_KEY`     | Supabase service_role key                    |
+| `NEXT_PUBLIC_SITE_URL`          | `https://inkcut-web.onrender.com`            |
+| `ADMIN_EMAILS`                  | your email (only you can use paid animation) |
 
-3. Click **Apply**. The first deploy takes a few minutes (the worker image installs FFmpeg).
-4. Open `https://inkcut-web.onrender.com`, sign in, and make a 1-minute video.
+3. Click **Apply** and wait for the website to deploy (a few minutes).
+
+## Step 4: Run the worker on your PC
+
+1. Render dashboard → **inkcut-queue** → **Connect** → copy the **External** Redis URL (starts with `rediss://`).
+2. Add these lines to `C:\dev\Inkcut\.env` (keep your existing SERV and Pollinations keys there):
+
+```
+SUPABASE_URL=<Supabase Project URL>
+SUPABASE_SERVICE_ROLE_KEY=<service_role key>
+REDIS_URL=<External Redis URL from Render>
+IMAGE_PROVIDER=pollinations
+```
+
+3. Start it and leave the window open:
+
+```powershell
+cd C:\dev\Inkcut
+pnpm worker
+```
+
+It prints `worker ready`. Now open your Render website, sign in, and make a video: the worker window shows it being made.
 
 ### Good to know
 
-- **Free web plan sleeps** after ~15 minutes without visitors; the first visit after that takes about a minute.
-  The worker never sleeps, so videos keep processing.
+- **Free website sleeps** after ~15 minutes without visitors; the first visit after that takes about a minute.
+- **Supabase free projects pause** after a week with no activity; un-pause from the Supabase dashboard.
 - **Costs per video** come from SERV (script and planning) and Pollinations (about 0.02 pollen of images per minute).
   Animation (`ADMIN_EMAILS` only) is about 1 pollen per animated minute.
-- **Limits** (spec §8, `packages/shared/src/limits.ts`): 3 videos and 30 redraws per user per day, 5 minutes max,
-  6,000-character scripts, 25 MB / 5-minute voiceovers, one running video per user, files deleted after 48 hours.
-- **Logs**: Render dashboard → service → Logs. Every worker line includes the project ID.
+- **Limits** (`packages/shared/src/limits.ts`): 3 videos and 30 redraws per user per day, 5 minutes max, 6,000-character
+  scripts, 25 MB / 5-minute voiceovers, one running video per user, files deleted after 48 hours (the worker's hourly
+  cleanup runs while it is on).
 
 ## Run the website locally (optional)
 

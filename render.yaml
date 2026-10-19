@@ -1,4 +1,7 @@
-# Render Blueprint for Inkcut: web app + video worker + job queue.
+# Render Blueprint for Inkcut: web app + job queue (both free plans).
+# The video worker runs on your own PC for now (`pnpm worker`, see README).
+# To move it to Render later (~$7/month Starter plan), paste the commented
+# block at the end of this file back under `services:`.
 # Render dashboard → New → Blueprint → pick this repo. Values marked `sync: false`
 # are asked for once in the dashboard and are never stored in git.
 # All three services must be in the same region so they can talk privately.
@@ -32,57 +35,63 @@ services:
           name: inkcut-queue
           property: connectionString
 
-  # Video worker: runs the pipeline with FFmpeg. Background workers have no free plan.
-  - type: worker
-    name: inkcut-worker
-    runtime: docker
-    region: oregon
-    plan: starter
-    dockerfilePath: ./apps/worker/Dockerfile
-    dockerContext: .
-    envVars:
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: inkcut-queue
-          property: connectionString
-      - key: SERV_API_KEY
-        sync: false
-      - key: SERV_BASE_URL
-        value: https://inference-api.openserv.ai/v1
-      - key: SERV_MODEL
-        value: gpt-5.4-mini
-      - key: IMAGE_PROVIDER
-        value: pollinations
-      - key: POLLINATIONS_API_KEY
-        sync: false
-      - key: POLLINATIONS_MODEL
-        value: black-forest-labs/flux.1-schnell
-      - key: ANIMATE_MODEL
-        value: bytedance/seedance-1-pro-fast
-      - key: ANIMATE_RESOLUTION
-        value: 480p
-      - key: TTS_PROVIDER
-        value: edge
-      - key: STT_PROVIDER
-        value: openai
-      - key: STT_API_KEY
-        sync: false
-      - key: STT_BASE_URL
-        value: https://api.openai.com/v1
-      - key: WORKER_CONCURRENCY
-        value: "1"
-      - key: LOG_FORMAT
-        value: json
-
   # Job queue (Redis-compatible). noeviction so queued jobs are never dropped.
   - type: keyvalue
     name: inkcut-queue
     region: oregon
     plan: free
     maxmemoryPolicy: noeviction
-    ipAllowList: []
+    # Open to external connections so a worker on your PC can reach the queue.
+    # Connections still need the password in the external Redis URL.
+    # Set this back to [] once the worker runs on Render.
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: worker on my PC
+
+# ── Optional paid worker on Render (uncomment and indent under services:) ──
+# # Video worker: runs the pipeline with FFmpeg. Background workers have no free plan.
+# - type: worker
+#   name: inkcut-worker
+#   runtime: docker
+#   region: oregon
+#   plan: starter
+#   dockerfilePath: ./apps/worker/Dockerfile
+#   dockerContext: .
+#   envVars:
+#     - key: SUPABASE_URL
+#       sync: false
+#     - key: SUPABASE_SERVICE_ROLE_KEY
+#       sync: false
+#     - key: REDIS_URL
+#       fromService:
+#         type: keyvalue
+#         name: inkcut-queue
+#         property: connectionString
+#     - key: SERV_API_KEY
+#       sync: false
+#     - key: SERV_BASE_URL
+#       value: https://inference-api.openserv.ai/v1
+#     - key: SERV_MODEL
+#       value: gpt-5.4-mini
+#     - key: IMAGE_PROVIDER
+#       value: pollinations
+#     - key: POLLINATIONS_API_KEY
+#       sync: false
+#     - key: POLLINATIONS_MODEL
+#       value: black-forest-labs/flux.1-schnell
+#     - key: ANIMATE_MODEL
+#       value: bytedance/seedance-1-pro-fast
+#     - key: ANIMATE_RESOLUTION
+#       value: 480p
+#     - key: TTS_PROVIDER
+#       value: edge
+#     - key: STT_PROVIDER
+#       value: openai
+#     - key: STT_API_KEY
+#       sync: false
+#     - key: STT_BASE_URL
+#       value: https://api.openai.com/v1
+#     - key: WORKER_CONCURRENCY
+#       value: "1"
+#     - key: LOG_FORMAT
+#       value: json
