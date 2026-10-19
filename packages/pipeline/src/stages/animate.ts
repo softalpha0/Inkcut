@@ -1,4 +1,4 @@
-import fsp from "node:fs/promises";
+﻿import fsp from "node:fs/promises";
 import { FPS, LIMITS, SCENE_GAP_SEC, type Scene } from "@inkcut/shared";
 import { sceneFileName } from "../project.js";
 import { mapLimit } from "../util/concurrency.js";
@@ -38,7 +38,10 @@ export function animationPromptFor(scene: Scene): string {
   return `${base} Keep the hand-drawn stickman style and white background, camera mostly still, no text.`;
 }
 
-/** Auth, permission and budget errors stop the stage; other failures fall back to zoom/pan for that scene. */
+/**
+ * Auth, permission and budget errors (e.g. a model that needs paid pollen) stop
+ * further animation calls; the video still finishes with zoom/pan for those scenes.
+ */
 function isAccountError(err: unknown): boolean {
   const status = statusOf(err);
   return status === 401 || status === 402 || status === 403;
@@ -84,9 +87,11 @@ export async function runAnimateStage(ctx: StageContext): Promise<void> {
   let newItems = 0;
   let done = 0;
   const failed: number[] = [];
+  let accountError: string | undefined;
   const concurrency = ctx.failAt?.stage === "animate" ? 1 : ANIMATE_CONCURRENCY;
   await mapLimit(todo, concurrency, async ({ scene, durationSec, outFile }) => {
     checkForcedFailure(ctx, "animate", newItems);
+    if (accountError) return;
     try {
       await provider.animate({
         imageFile: project.abs(scene.imagePath!),
@@ -97,8 +102,11 @@ export async function runAnimateStage(ctx: StageContext): Promise<void> {
       scene.videoPath = project.rel(outFile);
       newItems++;
     } catch (err) {
-      if (isAccountError(err)) throw err;
       await fsp.rm(outFile, { force: true });
+      if (isAccountError(err)) {
+        accountError ??= errorMessage(err);
+        return;
+      }
       failed.push(scene.index);
       log.warn(`scene ${scene.index} could not be animated; it keeps zoom/pan`, { error: errorMessage(err) });
     }
@@ -106,5 +114,8 @@ export async function runAnimateStage(ctx: StageContext): Promise<void> {
     done++;
     log.info(`animate ${done}/${todo.length}`, { scene: scene.index, sec: durationSec });
   });
-  log.info("animate done", { newClips: newItems, failed: failed.length });
+  if (accountError) {
+    log.warn("animation stopped; the remaining scenes keep zoom/pan", { error: accountError });
+  }
+  log.info("animate done", { newClips: newItems, failed: failed.length, skipped: accountError !== undefined });
 }

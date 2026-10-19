@@ -1,4 +1,4 @@
-import path from "node:path";
+﻿import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Scene } from "@inkcut/shared";
 import { runPipeline } from "../src/pipeline.js";
@@ -142,13 +142,21 @@ describe("animate stage", () => {
     expect(scenes.filter((s) => s.videoPath)).toHaveLength(1);
   });
 
-  it("stops on budget or permission errors instead of silently skipping every scene", async () => {
+  it("stops animating on budget or permission errors and still finishes with zoom/pan", async () => {
     const project = await newProject({ enabled: true });
     const counter = new ApiCallCounter();
     const fakes = fakeProviders(counter, { real: false });
     fakes.video.failFor.set("000.png", new HttpError(402, "budget too low"));
-    await expect(
-      runPipeline({ project, providers: fakes.providers, counter, log: silentLogger, media: fakeMedia }),
-    ).rejects.toThrow(/budget/);
+    fakes.video.failFor.set("001.png", new HttpError(402, "budget too low"));
+    fakes.video.failFor.set("002.png", new HttpError(402, "budget too low"));
+    const result = await runPipeline({
+      project,
+      providers: fakes.providers,
+      counter,
+      log: silentLogger,
+      media: fakeMedia,
+    });
+    expect(path.basename(result.outputPath)).toBe("final.mp4");
+    expect(project.manifest.scenes.filter((s) => s.videoPath)).toHaveLength(0);
   });
 });
