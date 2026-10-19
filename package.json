@@ -1,0 +1,36 @@
+{
+  "name": "inkcut",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Turn a topic, script or voiceover into a narrated stickman explainer video.",
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "cli": "pnpm --filter @inkcut/pipeline cli",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "clean": "rimraf out",
+    "dev:web": "pnpm --filter @inkcut/web dev",
+    "worker": "pnpm --filter @inkcut/worker start",
+    "build:web": "pnpm --filter @inkcut/web build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^20.19.0",
+    "eslint": "^10.13.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "rimraf": "^6.1.3",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.2",
+    "vitest": "^4.1.12"
+  }
+}

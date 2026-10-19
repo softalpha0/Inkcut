@@ -1,0 +1,88 @@
+# Render Blueprint for Inkcut: web app + video worker + job queue.
+# Render dashboard → New → Blueprint → pick this repo. Values marked `sync: false`
+# are asked for once in the dashboard and are never stored in git.
+# All three services must be in the same region so they can talk privately.
+
+services:
+  # Next.js website, landing page and API (free plan sleeps after ~15 min idle).
+  - type: web
+    name: inkcut-web
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false --filter "@inkcut/web..." && pnpm --filter @inkcut/web build
+    startCommand: pnpm --filter @inkcut/web start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: inkcut-queue
+          property: connectionString
+
+  # Video worker: runs the pipeline with FFmpeg. Background workers have no free plan.
+  - type: worker
+    name: inkcut-worker
+    runtime: docker
+    region: oregon
+    plan: starter
+    dockerfilePath: ./apps/worker/Dockerfile
+    dockerContext: .
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: inkcut-queue
+          property: connectionString
+      - key: SERV_API_KEY
+        sync: false
+      - key: SERV_BASE_URL
+        value: https://inference-api.openserv.ai/v1
+      - key: SERV_MODEL
+        value: gpt-5.4-mini
+      - key: IMAGE_PROVIDER
+        value: pollinations
+      - key: POLLINATIONS_API_KEY
+        sync: false
+      - key: POLLINATIONS_MODEL
+        value: black-forest-labs/flux.1-schnell
+      - key: ANIMATE_MODEL
+        value: bytedance/seedance-1-pro-fast
+      - key: ANIMATE_RESOLUTION
+        value: 480p
+      - key: TTS_PROVIDER
+        value: edge
+      - key: STT_PROVIDER
+        value: openai
+      - key: STT_API_KEY
+        sync: false
+      - key: STT_BASE_URL
+        value: https://api.openai.com/v1
+      - key: WORKER_CONCURRENCY
+        value: "1"
+      - key: LOG_FORMAT
+        value: json
+
+  # Job queue (Redis-compatible). noeviction so queued jobs are never dropped.
+  - type: keyvalue
+    name: inkcut-queue
+    region: oregon
+    plan: free
+    maxmemoryPolicy: noeviction
+    ipAllowList: []

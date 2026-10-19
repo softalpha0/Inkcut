@@ -1,0 +1,8 @@
+node_modules
+out
+pnpm-lock.yaml
+docs
+CLAUDE.md
+.next
+**/.next
+next-env.d.ts
