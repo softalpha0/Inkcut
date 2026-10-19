@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LIMITS } from "./limits.js";
 
 export const MotionSchema = z.enum(["zoom_in", "zoom_out", "pan_left", "pan_right", "static"]);
 export type Motion = z.infer<typeof MotionSchema>;
@@ -89,6 +90,48 @@ export function makeScenePlanSchema(sceneCount: number) {
 }
 export type ScenePlan = z.infer<ReturnType<typeof makeScenePlanSchema>>;
 
+/** Words of a thumbnail headline; *asterisks* mark the highlighted word. */
+export function headlineWords(headline: string): string[] {
+  return headline.replace(/\*/g, " ").split(/\s+/).filter(Boolean);
+}
+
+/** A thumbnail headline: short, punchy, a few big words (spec §5.5). */
+export const ThumbnailHeadlineSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(LIMITS.maxThumbnailHeadlineChars + 4) // room for the *highlight* markers
+  .refine((h) => headlineWords(h).length <= LIMITS.maxThumbnailHeadlineWords, {
+    message: `Use at most ${LIMITS.maxThumbnailHeadlineWords} words`,
+  })
+  .refine((h) => h.replace(/\*/g, "").trim().length <= LIMITS.maxThumbnailHeadlineChars, {
+    message: `Keep it under ${LIMITS.maxThumbnailHeadlineChars} characters`,
+  });
+
+/** What the LLM proposes for each thumbnail. */
+export const ThumbnailIdeaSchema = z.object({
+  headline: ThumbnailHeadlineSchema,
+  imagePrompt: z.string().trim().min(10).max(600),
+});
+
+export const ThumbnailPlanSchema = z.object({
+  thumbnails: z.array(ThumbnailIdeaSchema).length(LIMITS.thumbnailsPerVideo),
+});
+export type ThumbnailPlan = z.infer<typeof ThumbnailPlanSchema>;
+
+/** One thumbnail in the manifest. Paths are relative to the project folder. */
+export const ThumbnailSchema = ThumbnailIdeaSchema.extend({
+  index: z.number().int().nonnegative(),
+  seed: z.number().int().nonnegative(),
+  /** The drawn picture (no text). */
+  imagePath: z.string().optional(),
+  /** 1280x720 JPEG with the headline. */
+  outputPath: z.string().optional(),
+  /** 1280x720 JPEG without text. */
+  cleanPath: z.string().optional(),
+});
+export type Thumbnail = z.infer<typeof ThumbnailSchema>;
+
 /** Spec §5.3. */
 export const StylePresetSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
@@ -102,7 +145,16 @@ export const StylePresetSchema = z.object({
 });
 export type StylePreset = z.infer<typeof StylePresetSchema>;
 
-export const StageNameSchema = z.enum(["script", "transcribe", "plan", "voice", "draw", "animate", "render"]);
+export const StageNameSchema = z.enum([
+  "script",
+  "transcribe",
+  "plan",
+  "voice",
+  "draw",
+  "animate",
+  "render",
+  "thumbnail",
+]);
 export type StageName = z.infer<typeof StageNameSchema>;
 
 export const ProjectInputSchema = z.discriminatedUnion("mode", [
@@ -140,6 +192,8 @@ export const ProjectManifestSchema = z.object({
     .optional(),
   completedStages: z.array(StageNameSchema),
   scenes: z.array(SceneSchema),
+  /** YouTube thumbnails (thumbnail stage). */
+  thumbnails: z.array(ThumbnailSchema).optional(),
   outputPath: z.string().optional(),
   runs: z.array(
     z.object({

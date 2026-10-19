@@ -15,4 +15,4 @@ export function outputPath(userId: string, projectId: string): string {
 }
 
 /** Folders inside a project's assets prefix (storage lists are not recursive). */
-export const ASSET_FOLDERS = ["", "input", "audio", "images", "animated"] as const;
+export const ASSET_FOLDERS = ["", "input", "audio", "images", "animated", "thumbnails"] as const;

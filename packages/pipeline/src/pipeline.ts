@@ -4,13 +4,15 @@ import { ASSETS_DIR } from "./env.js";
 import type { Project } from "./project.js";
 import type { Providers } from "./providers.js";
 import { renderVideo } from "./render/compose.js";
+import { renderThumbnail } from "./render/thumbnail.js";
 import { getStyle } from "./styles/index.js";
-import type { FailAt, MediaTools, StageContext } from "./stages/context.js";
+import { ForcedFailure, type FailAt, type MediaTools, type StageContext } from "./stages/context.js";
 import { runAnimateStage } from "./stages/animate.js";
 import { runDrawStage } from "./stages/draw.js";
 import { runPlanStage } from "./stages/plan.js";
 import { runRenderStage } from "./stages/render.js";
 import { runScriptStage } from "./stages/script.js";
+import { runThumbnailStage } from "./stages/thumbnail.js";
 import { runTranscribeStage } from "./stages/transcribe.js";
 import { runVoiceStage } from "./stages/voice.js";
 import { probeDuration } from "./util/ffmpeg.js";
@@ -28,24 +30,29 @@ const STAGE_FNS: Record<StageName, StageFn> = {
   draw: runDrawStage,
   animate: runAnimateStage,
   render: runRenderStage,
+  thumbnail: runThumbnailStage,
 };
 
 /**
  * Spec §5: stages per input mode. Script mode starts from a provided script.txt.
  * `animate` does nothing unless the project was created or resumed with --animate.
+ * `thumbnail` runs last, so the video is ready even if thumbnails fail.
  */
 export function stagesFor(mode: InputMode): StageName[] {
   switch (mode) {
     case "topic":
-      return ["script", "plan", "voice", "draw", "animate", "render"];
+      return ["script", "plan", "voice", "draw", "animate", "render", "thumbnail"];
     case "script":
-      return ["plan", "voice", "draw", "animate", "render"];
+      return ["plan", "voice", "draw", "animate", "render", "thumbnail"];
     case "audio":
-      return ["transcribe", "plan", "draw", "animate", "render"];
+      return ["transcribe", "plan", "draw", "animate", "render", "thumbnail"];
   }
 }
 
-export const defaultMedia: MediaTools = { probeDuration, renderVideo };
+export const defaultMedia: MediaTools = { probeDuration, renderVideo, renderThumbnail };
+
+/** Stages whose failure only logs a warning in a full run (the video itself is fine without them). */
+const OPTIONAL_STAGES: readonly StageName[] = ["thumbnail"];
 
 export interface RunOptions {
   project: Project;
@@ -106,7 +113,15 @@ export async function runPipeline(opts: RunOptions): Promise<RunResult> {
       await opts.onStage?.(stage, i + 1, stages.length);
       const stageLog = log.child({ stage });
       const t0 = Date.now();
-      await STAGE_FNS[stage]({ ...ctx, log: stageLog });
+      try {
+        await STAGE_FNS[stage]({ ...ctx, log: stageLog });
+      } catch (err) {
+        // Report it when only optional stages were asked for (a thumbnail job) or in a forced test failure.
+        const onlyOptional = opts.only?.every((s) => OPTIONAL_STAGES.includes(s)) ?? false;
+        if (!OPTIONAL_STAGES.includes(stage) || onlyOptional || err instanceof ForcedFailure) throw err;
+        stageLog.warn(`${stage} failed; the video is still done`, { error: errorMessage(err) });
+        continue;
+      }
       await project.markDone(stage);
       stageLog.info(`stage finished in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
     }

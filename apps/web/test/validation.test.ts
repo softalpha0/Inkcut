@@ -2,6 +2,7 @@ import { LIMITS } from "@inkcut/shared";
 import { describe, expect, it } from "vitest";
 import {
   CreateProjectSchema,
+  UpdateThumbnailSchema,
   UpdateSceneSchema,
   UploadRequestSchema,
   audioExtension,
@@ -127,5 +128,19 @@ describe("helpers", () => {
           .success,
       ).toBe(true);
     }
+  });
+});
+
+describe("UpdateThumbnailSchema", () => {
+  it("accepts a short headline, a redraw, or both", () => {
+    expect(UpdateThumbnailSchema.safeParse({ headline: "BANKS *LIE*" }).success).toBe(true);
+    expect(UpdateThumbnailSchema.safeParse({ redraw: true }).success).toBe(true);
+    expect(UpdateThumbnailSchema.safeParse({ headline: "WHY *NOW*", redraw: true }).success).toBe(true);
+  });
+
+  it("rejects an empty request and headlines that are too long", () => {
+    expect(UpdateThumbnailSchema.safeParse({}).success).toBe(false);
+    expect(UpdateThumbnailSchema.safeParse({ headline: "one two three four five six" }).success).toBe(false);
+    expect(UpdateThumbnailSchema.safeParse({ headline: "X".repeat(40) }).success).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
-﻿import path from "node:path";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import type { Scene } from "@inkcut/shared";
+import { LIMITS, type Scene } from "@inkcut/shared";
 import { runPipeline } from "../src/pipeline.js";
 import { Project } from "../src/project.js";
 import { ForcedFailure, parseFailAt } from "../src/stages/context.js";
@@ -108,9 +108,9 @@ describe("animate stage", () => {
     const total = project.manifest.scenes.length;
     const second = run(project);
     await second.promise;
-    expect(second.fakes.llm.calls).toBe(0);
+    expect(second.fakes.llm.calls).toBe(1); // thumbnails
     expect(second.fakes.tts.calls).toBe(0);
-    expect(second.fakes.images.calls).toBe(0);
+    expect(second.fakes.images.calls).toBe(LIMITS.thumbnailsPerVideo);
     expect(second.fakes.video.calls).toBe(total - 2);
   });
 

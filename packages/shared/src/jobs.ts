@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { LIMITS } from "./limits.js";
+import { ThumbnailHeadlineSchema } from "./schemas.js";
 
 /** BullMQ queue shared by the web app (producer) and the worker (consumer). */
 export const QUEUE_NAME = "inkcut";
@@ -17,6 +19,18 @@ export const JobDataSchema = z.discriminatedUnion("type", [
     type: z.literal("revoice"),
     projectId: z.string().uuid(),
     sceneIndex: z.number().int().nonnegative(),
+  }),
+  /** Rewrite a thumbnail's headline and/or draw a new picture for it. */
+  z.object({
+    type: z.literal("thumbnail"),
+    projectId: z.string().uuid(),
+    index: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(LIMITS.thumbnailsPerVideo - 1),
+    headline: ThumbnailHeadlineSchema.optional(),
+    redraw: z.boolean().default(false),
   }),
   /** Render the MP4 from the current scenes. */
   z.object({ type: z.literal("render"), projectId: z.string().uuid() }),
@@ -62,6 +76,8 @@ export const STAGE_STATUS = {
   draw: "drawing",
   animate: "animating",
   render: "rendering",
+  // No separate DB status: thumbnails are made right after the render.
+  thumbnail: "rendering",
 } as const satisfies Record<string, ProjectStatus>;
 
 /** BullMQ job id: one job per project at a time (duplicates are ignored by BullMQ). */

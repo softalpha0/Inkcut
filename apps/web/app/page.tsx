@@ -29,6 +29,10 @@ const STEPS = [
 
 const FEATURES = [
   {
+    title: "3 click-worthy thumbnails",
+    body: "Every video comes with three YouTube thumbnails, each a different hook. Upload all three to YouTube's Test & compare and let it pick the winner.",
+  },
+  {
     title: "Captions that land on the word",
     body: "Captions are timed from the voice itself, a few words at a time, burned into the video.",
   },
@@ -74,6 +78,10 @@ const FAQ = [
   {
     q: "How long do you keep my video?",
     a: `${LIMITS.outputRetentionHours} hours after it is rendered, then it is deleted. Download it before then.`,
+  },
+  {
+    q: "Do I get a thumbnail?",
+    a: "Yes, three. Each has a different hook headline and picture in your video's style, sized 1280x720 for YouTube. Change the words or draw a new picture anytime, and download a version without text if you prefer to add your own.",
   },
   {
     q: "Can I use my own art style?",
@@ -274,10 +282,11 @@ export default function Landing() {
             Made for <span className="marker">faceless channels</span> and teachers
           </h2>
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((f) => (
+            {FEATURES.map((f, i) => (
               <div
                 key={f.title}
-                className="rounded-2xl border-2 border-ink bg-white p-5 shadow-[4px_4px_0_0_var(--color-ink)]"
+                // The first feature (thumbnails) is a full-width highlight above the others.
+                className={`rounded-2xl border-2 border-ink p-5 shadow-[4px_4px_0_0_var(--color-ink)] ${i === 0 ? "bg-marker/40 sm:col-span-2 lg:col-span-3" : "bg-white"}`}
               >
                 <h3 className="font-display text-lg">{f.title}</h3>
                 <p className="mt-2 text-sm text-ink-2">{f.body}</p>

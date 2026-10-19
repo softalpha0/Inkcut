@@ -1,5 +1,13 @@
 import { currentUser, fail, json } from "@/lib/server/http";
-import { getOwnedProject, listScenes, signAssetUrls, signOutputUrl } from "@/lib/server/projects";
+import {
+  getOwnedProject,
+  isActive,
+  listScenes,
+  readThumbnails,
+  signAssetUrls,
+  signOutputUrl,
+  thumbnailStoragePath,
+} from "@/lib/server/projects";
 
 /** GET /api/projects/:id: project, scenes and short-lived media URLs. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -15,9 +23,24 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   );
   const videoUrl =
     project.output_path && project.status !== "expired" ? await signOutputUrl(project.output_path) : null;
+  // Thumbnails live in the saved project.json; skip the read while a job is still running.
+  const thumbs = isActive(project) || project.status === "expired" ? [] : await readThumbnails(project);
+  const ready = thumbs.filter((t) => t.outputPath && t.cleanPath);
+  const thumbUrls = await signAssetUrls(
+    ready.flatMap((t) => [
+      thumbnailStoragePath(project, t.outputPath!),
+      thumbnailStoragePath(project, t.cleanPath!),
+    ]),
+  );
   return json({
     project,
     videoUrl,
+    thumbnails: ready.map((t) => ({
+      index: t.index,
+      headline: t.headline,
+      url: thumbUrls[thumbnailStoragePath(project, t.outputPath!)] ?? null,
+      cleanUrl: thumbUrls[thumbnailStoragePath(project, t.cleanPath!)] ?? null,
+    })),
     scenes: scenes.map((s) => ({
       id: s.id,
       index: s.index,

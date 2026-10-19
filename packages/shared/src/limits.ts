@@ -12,6 +12,12 @@ export const LIMITS = {
   maxScriptChars: 6000,
   /** Longest custom art-style description, characters. */
   maxCustomStyleChars: 200,
+  /** Thumbnails made per video (YouTube "Test & compare" takes up to 3). */
+  thumbnailsPerVideo: 3,
+  /** Longest thumbnail headline, characters. */
+  maxThumbnailHeadlineChars: 32,
+  /** Most words in a thumbnail headline. */
+  maxThumbnailHeadlineWords: 5,
   /** Single-scene redraws a user may run per day. */
   redrawsPerUserPerDay: 30,
   /** Longest uploaded voiceover, seconds. */

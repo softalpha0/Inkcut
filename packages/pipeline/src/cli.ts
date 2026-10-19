@@ -235,6 +235,10 @@ async function main(): Promise<void> {
     });
     console.log(`\nDone in ${(result.durationMs / 1000).toFixed(1)}s`);
     console.log(`  output   : ${result.outputPath}`);
+    for (const t of project.manifest.thumbnails ?? []) {
+      if (t.outputPath)
+        console.log(`  thumbnail: ${project.abs(t.outputPath)}  "${t.headline.replace(/\*/g, "")}"`);
+    }
     console.log(`  API calls: ${formatCalls(result.apiCalls)}`);
   } catch (err) {
     console.error(`\nFailed: ${errorMessage(err)}`);

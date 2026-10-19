@@ -3,6 +3,7 @@ import {
   CUSTOM_STYLE_ID,
   LIMITS,
   STYLE_OPTIONS,
+  ThumbnailHeadlineSchema,
   VOICES,
   customStyleProblem,
 } from "@inkcut/shared";
@@ -65,6 +66,14 @@ export const UpdateSceneSchema = z
     imagePrompt: z.string().trim().min(3).max(800).optional(),
   })
   .refine((v) => v.narration !== undefined || v.imagePrompt !== undefined, "Nothing to update");
+
+/** POST /api/projects/:id/thumbnails/:index body: new headline text and/or a new picture. */
+export const UpdateThumbnailSchema = z
+  .object({
+    headline: ThumbnailHeadlineSchema.optional(),
+    redraw: z.boolean().default(false),
+  })
+  .refine((v) => v.headline !== undefined || v.redraw, "Nothing to update");
 
 /** POST /api/uploads/voiceover body. */
 export const UploadRequestSchema = z.object({

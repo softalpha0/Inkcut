@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { ACTIVE_STATUSES } from "@inkcut/shared";
+import { ACTIVE_STATUSES, LIMITS } from "@inkcut/shared";
 import { Stickman } from "@/components/Stickman";
 import { Button, Card, StatusBadge, statusLabel } from "@/components/ui";
 import { browserSupabase } from "@/lib/supabase/client";
@@ -16,6 +16,13 @@ interface SceneView {
   videoUrl: string | null;
 }
 
+interface ThumbnailView {
+  index: number;
+  headline: string;
+  url: string | null;
+  cleanUrl: string | null;
+}
+
 interface ProjectData {
   project: {
     id: string;
@@ -29,6 +36,7 @@ interface ProjectData {
     output_expires_at: string | null;
   };
   videoUrl: string | null;
+  thumbnails: ThumbnailView[];
   scenes: SceneView[];
 }
 
@@ -99,7 +107,7 @@ export function ProjectView({ id }: { id: string }) {
     );
   }
 
-  const { project, scenes, videoUrl } = data;
+  const { project, scenes, videoUrl, thumbnails } = data;
   const vertical = project.aspect === "9:16";
   const stages = [...STAGES[project.input_mode]!];
   if (project.animate) stages.splice(stages.indexOf("rendering"), 0, "animating");
@@ -205,6 +213,40 @@ export function ProjectView({ id }: { id: string }) {
             </p>
           ) : null}
         </div>
+      ) : null}
+
+      {project.status === "done" && thumbnails.length === 0 && scenes.length > 0 ? (
+        <Card className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-display text-lg">Get YouTube thumbnails</p>
+            <p className="text-sm text-ink-2">
+              Three click-worthy thumbnails for this video. Takes about a minute.
+            </p>
+          </div>
+          <Button onClick={() => void act(`/api/projects/${project.id}/render`)}>Make thumbnails</Button>
+        </Card>
+      ) : null}
+
+      {thumbnails.length > 0 ? (
+        <section>
+          <h2 className="font-display text-2xl">Thumbnails</h2>
+          <p className="mt-1 max-w-3xl text-sm text-ink-2">
+            Three different hooks for the same video. Upload all three in YouTube Studio under{" "}
+            <strong>Test &amp; compare</strong>: YouTube shows each to different viewers and keeps the one
+            that gets the most clicks. Put <strong>*stars*</strong> around the word you want in yellow.
+          </p>
+          <div className="mt-5 grid gap-5 md:grid-cols-3">
+            {thumbnails.map((t) => (
+              <ThumbnailEditor
+                key={`${t.index}-${t.headline}-${t.url ?? ""}`}
+                projectId={project.id}
+                thumb={t}
+                disabled={active || project.status === "expired"}
+                act={act}
+              />
+            ))}
+          </div>
+        </section>
       ) : null}
 
       {scenes.length > 0 ? (
@@ -332,6 +374,78 @@ function SceneEditor({
               Re-voice
             </Button>
           ) : null}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function ThumbnailEditor({
+  projectId,
+  thumb,
+  disabled,
+  act,
+}: {
+  projectId: string;
+  thumb: ThumbnailView;
+  disabled: boolean;
+  act: (url: string, method?: string, body?: unknown) => Promise<boolean>;
+}) {
+  const [headline, setHeadline] = useState(thumb.headline);
+  const dirty = headline.trim() !== thumb.headline && headline.trim().length > 0;
+  const base = `/api/projects/${projectId}/thumbnails/${thumb.index}`;
+  const link =
+    "inline-flex items-center rounded-lg border-2 border-ink bg-white px-3 py-1.5 text-sm font-bold hover:bg-paper-2";
+
+  return (
+    <article className="overflow-hidden rounded-2xl border-2 border-ink bg-white shadow-[4px_4px_0_0_var(--color-ink)]">
+      <div className="relative aspect-video bg-paper-2">
+        {thumb.url ? (
+          <img src={thumb.url} alt={`Thumbnail ${thumb.index + 1}`} className="size-full object-cover" />
+        ) : (
+          <div className="grid size-full place-items-center text-sm text-muted">Not ready yet</div>
+        )}
+        <span className="absolute left-2 top-2 rounded-md border-2 border-ink bg-white px-2 py-0.5 text-xs font-bold">
+          {thumb.index + 1}
+        </span>
+      </div>
+      <div className="space-y-3 p-4">
+        <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+          Headline
+          <input
+            className="mt-1 w-full rounded-lg border-2 border-ink bg-white px-2.5 py-2 text-sm normal-case tracking-normal text-ink outline-none focus:shadow-[2px_2px_0_0_var(--color-marker)] disabled:bg-paper-2"
+            value={headline}
+            disabled={disabled}
+            maxLength={LIMITS.maxThumbnailHeadlineChars + 4}
+            onChange={(e) => setHeadline(e.target.value)}
+          />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {dirty ? (
+            <Button
+              className="px-3 py-1.5 text-sm"
+              disabled={disabled}
+              onClick={() => void act(base, "POST", { headline: headline.trim() })}
+            >
+              Update text
+            </Button>
+          ) : null}
+          <Button
+            variant="ghost"
+            className="px-3 py-1.5 text-sm"
+            disabled={disabled}
+            onClick={() =>
+              void act(base, "POST", { redraw: true, ...(dirty ? { headline: headline.trim() } : {}) })
+            }
+          >
+            New picture
+          </Button>
+          <a href={`${base}/download`} className={link}>
+            ⬇ Download
+          </a>
+          <a href={`${base}/download?clean=1`} className={`${link} font-semibold text-ink-2`}>
+            No text
+          </a>
         </div>
       </div>
     </article>

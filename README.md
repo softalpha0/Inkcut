@@ -9,7 +9,7 @@ Browser ──▶ Next.js web + API (apps/web) ──enqueue──▶ Redis queu
    └── Supabase Auth · Postgres (projects, scenes, limits) · Storage ◀────┘
 
 Pipeline (packages/pipeline):
-topic ─SERV─▶ script ─SERV─▶ scenes ─Edge TTS─▶ voice ─Pollinations/fal─▶ images ─(optional)─▶ animated clips ─FFmpeg─▶ final.mp4
+topic ─SERV─▶ script ─SERV─▶ scenes ─Edge TTS─▶ voice ─Pollinations/fal─▶ images ─(optional)─▶ animated clips ─FFmpeg─▶ final.mp4 ─▶ 3 thumbnails
 ```
 
 | Folder              | What it is                                                                    |
@@ -82,7 +82,7 @@ pnpm cli --topic "How compound interest works" --custom-style "1950s retro carto
 #   --out D:\videos            (default: .\out)
 ```
 
-The video is written to `out\<projectId>\final.mp4`.
+The video is written to `out\<projectId>\final.mp4`, with three YouTube thumbnails in `out\<projectId>\thumbnails\` (`thumb-1.jpg` … and `-clean` versions without text).
 
 ### Animated scenes (optional, paid)
 

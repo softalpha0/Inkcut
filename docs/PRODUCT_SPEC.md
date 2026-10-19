@@ -137,6 +137,7 @@ Every stage is **idempotent and resumable**: outputs are saved after each stage,
 | 4. `voice` | scene narration | one audio file per scene + measured duration | Edge TTS + ffprobe |
 | 5. `draw` | scene image prompt + style | one image per scene | Image provider |
 | 6. `render` | images + audio + captions | final MP4 | FFmpeg |
+| 7. `thumbnail` | narration, characters, style | 3 YouTube thumbnails (§5.5) | SERV + image provider + FFmpeg |
 
 ### 5.1 Scene schema
 
@@ -195,6 +196,22 @@ are rejected so Inkcut describes a look instead of copying a protected brand.
 
 Must work on Windows (local dev) and Linux (worker Docker). Use `ffmpeg-static` + `ffprobe-static` locally; system FFmpeg in Docker.
 
+### 5.5 Thumbnails
+After the render, every video gets `LIMITS.thumbnailsPerVideo` (3) YouTube thumbnails, so the user can
+upload all three to YouTube Studio's "Test & compare":
+1. SERV writes three ideas with different angles (curiosity, emotion, payoff): a headline of 2–4 words
+   (max 5 words / 32 characters, key word in `*stars*`) and an image prompt (one character close-up with a
+   strong expression, props on the right, plain left half for the text). zod-validated with retries.
+2. One picture per idea in the video's style, always 16:9, each with its own seed.
+3. FFmpeg crops to 1280x720, adds a little colour pop and burns in the headline with libass
+   (Nunito ExtraBold, white with thick black outline, starred word in yellow). Writes `thumb-N.jpg`
+   and a text-free `thumb-N-clean.jpg` (JPEG, well under YouTube's 2 MB limit).
+
+Thumbnails are stored with the project's assets (`thumbnails/`) and listed in `project.json`; no extra
+DB column. In a full run a thumbnail failure only logs a warning (the video is still done). Editing a
+headline re-renders the text only (free); "New picture" redraws one image and counts as a redraw.
+A render job also creates thumbnails for older videos that have none.
+
 ---
 
 ## 6. Data model (Supabase Postgres)
@@ -232,6 +249,8 @@ usage_daily   (user_id fk, day date, videos_started int, redraws int, pk(user_id
 | POST | `/api/scenes/:id/revoice` | Enqueue single-scene re-voice |
 | POST | `/api/projects/:id/render` | Enqueue render only |
 | GET | `/api/projects/:id/download` | Signed URL for MP4 |
+| POST | `/api/projects/:id/thumbnails/:index` | New headline and/or new picture for one thumbnail |
+| GET | `/api/projects/:id/thumbnails/:index/download` | Thumbnail JPEG (`?clean=1` without text) |
 | POST | `/api/uploads/voiceover` | Signed upload URL |
 
 Progress: worker updates `projects.status/current_stage`; web subscribes via Supabase Realtime.

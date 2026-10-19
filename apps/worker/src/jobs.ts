@@ -13,6 +13,8 @@ import {
   projectSeed,
   runPipeline,
   sceneFileName,
+  thumbnailFiles,
+  thumbnailSeed,
   type Logger,
   type MediaTools,
   type Providers,
@@ -46,16 +48,25 @@ const ONLY: Record<ProjectJob["type"], StageName[] | undefined> = {
   generate: undefined,
   redraw: ["draw", "animate"],
   revoice: ["voice"],
-  render: ["render"],
+  // Also makes thumbnails for videos created before thumbnails existed (no-op when present).
+  render: ["render", "thumbnail"],
+  thumbnail: ["thumbnail"],
 };
 
 /** Status after a job succeeds: jobs that end with a render are done; scene edits need a new render. */
-const DONE_STATUS: Record<ProjectJob["type"], ProjectStatus> = {
-  generate: "done",
-  render: "done",
-  redraw: "draft",
-  revoice: "draft",
-};
+function doneStatus(data: ProjectJob, row: ProjectRow): ProjectStatus {
+  switch (data.type) {
+    case "generate":
+    case "render":
+      return "done";
+    case "redraw":
+    case "revoice":
+      return "draft";
+    case "thumbnail":
+      // A thumbnail edit does not touch the video.
+      return row.output_path ? "done" : "draft";
+  }
+}
 
 function inputFor(row: ProjectRow, audioExt: string): ProjectInput {
   switch (row.input_mode) {
@@ -140,6 +151,27 @@ async function dropSceneFiles(project: Project, index: number, kind: "image" | "
   await project.save();
 }
 
+/** Thumbnail job: new headline and/or a new picture; the stage then redoes only what is missing. */
+async function prepareThumbnail(
+  project: Project,
+  data: Extract<ProjectJob, { type: "thumbnail" }>,
+): Promise<void> {
+  const thumb = project.manifest.thumbnails?.[data.index];
+  if (!thumb) throw new Error("This video has no thumbnails yet; render it first");
+  if (data.headline) thumb.headline = data.headline;
+  const files = thumbnailFiles(data.index);
+  const drop = [files.output, files.clean, ...(data.redraw ? [files.image] : [])];
+  await Promise.all(drop.map((f) => fsp.rm(project.abs(f), { force: true })));
+  if (data.redraw) {
+    // A different seed gives a different picture from the same idea.
+    thumb.seed = thumbnailSeed(thumb.seed, 0, 1);
+    delete thumb.imagePath;
+  }
+  delete thumb.outputPath;
+  delete thumb.cleanPath;
+  await project.save();
+}
+
 export function sceneRows(project: Project, prefix: string): SceneInput[] {
   const stored = (rel?: string) => (rel ? `${prefix}/${rel}` : null);
   return project.manifest.scenes.map((s) => ({
@@ -185,6 +217,7 @@ export async function runProjectJob(data: ProjectJob, deps: WorkerDeps): Promise
     applySceneEdits(project, await deps.projects.listScenes(row.id));
     if (data.type === "redraw") await dropSceneFiles(project, data.sceneIndex, "image");
     if (data.type === "revoice") await dropSceneFiles(project, data.sceneIndex, "voice");
+    if (data.type === "thumbnail") await prepareThumbnail(project, data);
     await project.save();
 
     log.info("job started");
@@ -219,7 +252,7 @@ export async function runProjectJob(data: ProjectJob, deps: WorkerDeps): Promise
       });
     }
     await deps.projects.updateProject(row.id, {
-      status: DONE_STATUS[data.type],
+      status: doneStatus(data, row),
       current_stage: null,
       error: null,
     });

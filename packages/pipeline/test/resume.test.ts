@@ -1,7 +1,7 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import type { ProjectInput } from "@inkcut/shared";
+import { LIMITS, type ProjectInput } from "@inkcut/shared";
 import { runPipeline } from "../src/pipeline.js";
 import { Project } from "../src/project.js";
 import { ForcedFailure, parseFailAt } from "../src/stages/context.js";
@@ -37,6 +37,8 @@ function run(project: Project, opts: { failAt?: string; stt?: FakeStt } = {}) {
   return { promise, fakes, counter };
 }
 
+const THUMBS = LIMITS.thumbnailsPerVideo;
+
 describe("resume", () => {
   it("after a forced failure at draw, resumes without calling SERV or TTS again", async () => {
     const project = await newProject({ mode: "topic", topic: "Why we procrastinate", minutes: 1 });
@@ -55,10 +57,11 @@ describe("resume", () => {
     const reloaded = await Project.load(path.dirname(project.dir), project.id);
     const second = run(reloaded);
     const result = await second.promise;
-    expect(second.fakes.llm.calls).toBe(0);
+    // Only the thumbnail stage (never reached before) calls SERV, plus its pictures.
+    expect(second.fakes.llm.calls).toBe(1);
     expect(second.fakes.tts.calls).toBe(0);
-    expect(second.fakes.images.calls).toBe(scenes - 2);
-    expect(result.apiCalls).toEqual({ fal: scenes - 2 });
+    expect(second.fakes.images.calls).toBe(scenes - 2 + THUMBS);
+    expect(result.apiCalls).toEqual({ fal: scenes - 2 + THUMBS, serv: 1 });
     expect(result.outputPath).toBe(reloaded.path("final.mp4"));
     expect(reloaded.manifest.completedStages).toEqual([
       "script",
@@ -67,6 +70,7 @@ describe("resume", () => {
       "draw",
       "animate",
       "render",
+      "thumbnail",
     ]);
     expect(reloaded.manifest.runs.map((r) => r.status)).toEqual(["failed", "done"]);
   });
@@ -78,9 +82,9 @@ describe("resume", () => {
 
     const second = run(project);
     await second.promise;
-    expect(second.fakes.llm.calls).toBe(0);
+    expect(second.fakes.llm.calls).toBe(1); // thumbnails
     expect(second.fakes.tts.calls).toBe(scenes - 3);
-    expect(second.fakes.images.calls).toBe(scenes);
+    expect(second.fakes.images.calls).toBe(scenes + THUMBS);
   });
 
   it("re-running a finished project makes no API calls", async () => {
@@ -98,7 +102,7 @@ describe("resume", () => {
     await fsp.writeFile(project.path("script.txt"), script);
     const { promise, fakes } = run(project);
     await promise;
-    expect(fakes.llm.calls).toBe(1); // plan only
+    expect(fakes.llm.calls).toBe(2); // plan + thumbnails, no script
     expect(project.manifest.scenes.map((s) => s.narration).join(" ")).toBe(script);
   });
 
@@ -123,6 +127,6 @@ describe("resume", () => {
     const second = run(project, { stt });
     await second.promise;
     expect(stt.calls).toBe(1);
-    expect(second.fakes.llm.calls).toBe(0);
+    expect(second.fakes.llm.calls).toBe(1); // thumbnails only
   });
 });

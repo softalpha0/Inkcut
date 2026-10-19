@@ -1,6 +1,7 @@
 import "server-only";
-import { BUCKETS, type ProjectRow, type SceneRow } from "@inkcut/db";
-import { ACTIVE_STATUSES } from "@inkcut/shared";
+import { BUCKETS, assetsPrefix, type ProjectRow, type SceneRow } from "@inkcut/db";
+import { ACTIVE_STATUSES, ThumbnailSchema, type Thumbnail } from "@inkcut/shared";
+import { z } from "zod";
 import { utcDay, type UsageToday } from "../validation";
 import { adminSupabase } from "../supabase/admin";
 
@@ -99,4 +100,32 @@ export async function listScenes(projectId: string): Promise<SceneRow[]> {
     .order("index");
   if (error) throw new Error(error.message);
   return (data ?? []) as SceneRow[];
+}
+
+export async function signAssetUrl(path: string, download?: string): Promise<string | null> {
+  const { data } = await adminSupabase()
+    .storage.from(BUCKETS.assets)
+    .createSignedUrl(path, SIGNED_URL_SECONDS, download ? { download } : undefined);
+  return data?.signedUrl ?? null;
+}
+
+const ManifestThumbnailsSchema = z.object({ thumbnails: z.array(ThumbnailSchema).optional() });
+
+/** The project's thumbnails, read from its saved project.json (the worker keeps it in storage). */
+export async function readThumbnails(project: Pick<ProjectRow, "id" | "user_id">): Promise<Thumbnail[]> {
+  const { data, error } = await adminSupabase()
+    .storage.from(BUCKETS.assets)
+    .download(`${assetsPrefix(project.user_id, project.id)}/project.json`);
+  if (error || !data) return [];
+  try {
+    const parsed = ManifestThumbnailsSchema.safeParse(JSON.parse(await data.text()));
+    return parsed.success ? (parsed.data.thumbnails ?? []) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Storage path of one thumbnail file (relative manifest path → bucket path). */
+export function thumbnailStoragePath(project: Pick<ProjectRow, "id" | "user_id">, rel: string): string {
+  return `${assetsPrefix(project.user_id, project.id)}/${rel}`;
 }

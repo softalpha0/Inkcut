@@ -1,4 +1,4 @@
-import type { StylePreset } from "@inkcut/shared";
+import { LIMITS, type StylePreset } from "@inkcut/shared";
 import type { LlmMessage } from "./types.js";
 
 export function scriptMessages(topic: string, targetWords: number): LlmMessage[] {
@@ -53,5 +53,47 @@ export function planMessages(chunks: string[], style: StylePreset): LlmMessage[]
         .join("\n"),
     },
     { role: "user", content: `Scenes:\n${numbered}` },
+  ];
+}
+
+/** Thumbnail ideas: three different click-worthy hooks for the same video. */
+export function thumbnailMessages(
+  title: string,
+  narration: string,
+  style: StylePreset,
+  characters: string | undefined,
+): LlmMessage[] {
+  return [
+    {
+      role: "system",
+      content: [
+        "You design YouTube thumbnails that people want to click, for a narrated illustrated explainer video.",
+        `Art style (added automatically later, do NOT repeat it): ${style.name}.`,
+        characters ? `Recurring characters (describe them with exactly these words): ${characters}` : "",
+        "",
+        `Make exactly ${LIMITS.thumbnailsPerVideo} thumbnails, each with a DIFFERENT angle:`,
+        "1. Curiosity: a question or mystery the viewer needs answered.",
+        "2. Emotion: shock, fear or surprise about the most dramatic fact.",
+        "3. Payoff: the surprising result, mistake or secret the video reveals.",
+        "",
+        "Rules for `headline`:",
+        `- 2 to 4 words (never more than ${LIMITS.maxThumbnailHeadlineWords}), under ${LIMITS.maxThumbnailHeadlineChars} characters, ALL CAPS.`,
+        "- Wrap the single most important word in *asterisks* so it is highlighted, e.g. 'THEY *LIED* TO YOU'.",
+        "- It must complement the title, not repeat it. Honest: the video must deliver what it promises.",
+        "- No emojis, hashtags, quotes or punctuation except ? or !.",
+        "",
+        "Rules for `imagePrompt` (20 to 45 words):",
+        "- ONE recurring character in close-up with a big, exaggerated facial expression that fits the headline.",
+        "- One or two large, simple props that tell the story at a glance (money bag, broken phone, clock...).",
+        "- Put the character and props in the RIGHT half of the frame; keep the LEFT half a plain, simple, bright background (the headline goes there).",
+        "- Bold, high-contrast, uncluttered. Absolutely no text, letters, numbers, signs or speech bubbles.",
+        "",
+        "Reply with ONLY a JSON object in exactly this shape (no markdown):",
+        '{"thumbnails": [{"headline": "...", "imagePrompt": "..."}, {"headline": "...", "imagePrompt": "..."}, {"headline": "...", "imagePrompt": "..."}]}',
+      ]
+        .filter((line) => line !== "")
+        .join("\n"),
+    },
+    { role: "user", content: `Video title: ${title}\n\nNarration:\n${narration}` },
   ];
 }

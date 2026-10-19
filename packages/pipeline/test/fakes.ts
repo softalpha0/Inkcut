@@ -52,6 +52,14 @@ export class FakeLlm implements LlmClient {
     if (queued !== undefined) return queued;
     const system = messages.find((m) => m.role === "system")?.content ?? "";
     const firstUser = messages.find((m) => m.role === "user")?.content ?? "";
+    if (system.includes("YouTube thumbnails")) {
+      return JSON.stringify({
+        thumbnails: ["WHY YOU *WAIT*", "YOUR BRAIN *LIES*", "THE 5 MINUTE *FIX*"].map((headline, i) => ({
+          headline,
+          imagePrompt: `Sam looks shocked next to a giant clock, idea ${i}`,
+        })),
+      });
+    }
     if (system.includes("narration scripts")) {
       const target = Number(/about (\d+) words/.exec(system)?.[1] ?? 150);
       return fakeScript(target);
@@ -247,5 +255,10 @@ export const fakeMedia: MediaTools = {
   async renderVideo(job) {
     await fsp.writeFile(job.outFile, "fake mp4");
     return job.outFile;
+  },
+  async renderThumbnail(job) {
+    await fsp.mkdir(path.dirname(job.outFile), { recursive: true });
+    await fsp.writeFile(job.outFile, `fake thumbnail ${job.headline}`);
+    await fsp.writeFile(job.cleanFile, "fake clean thumbnail");
   },
 };

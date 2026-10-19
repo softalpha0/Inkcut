@@ -2,11 +2,13 @@ import { StageNameSchema, type StageName, type StylePreset } from "@inkcut/share
 import type { Project } from "../project.js";
 import type { Providers } from "../providers.js";
 import type { RenderJob } from "../render/compose.js";
+import type { ThumbnailRenderJob } from "../render/thumbnail.js";
 import type { Logger } from "../util/log.js";
 
 export interface MediaTools {
   probeDuration(file: string): Promise<number>;
   renderVideo(job: RenderJob): Promise<string>;
+  renderThumbnail(job: ThumbnailRenderJob): Promise<void>;
 }
 
 /** Testing aid: INKCUT_FAIL_AT=draw (before the first new item) or draw:2 (after two new items). */
