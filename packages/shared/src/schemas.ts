@@ -114,9 +114,38 @@ export const ThumbnailIdeaSchema = z.object({
   imagePrompt: z.string().trim().min(10).max(600),
 });
 
-export const ThumbnailPlanSchema = z.object({
-  thumbnails: z.array(ThumbnailIdeaSchema).length(LIMITS.thumbnailsPerVideo),
-});
+const pick = (o: Record<string, unknown>, keys: string[]) =>
+  keys.map((k) => o[k]).find((v) => typeof v === "string");
+
+/**
+ * LLM replies vary: a bare array, another top-level key, or snake_case fields.
+ * Normalise those before validating so they don't cost a retry.
+ */
+function normaliseThumbnailPlan(value: unknown): unknown {
+  let list: unknown = value;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const o = value as Record<string, unknown>;
+    list = Array.isArray(o.thumbnails) ? o.thumbnails : Object.values(o).find(Array.isArray);
+  }
+  if (!Array.isArray(list)) return value;
+  return {
+    thumbnails: list.map((item) => {
+      if (!item || typeof item !== "object") return item;
+      const o = item as Record<string, unknown>;
+      return {
+        headline: pick(o, ["headline", "title", "text", "hook"]),
+        imagePrompt: pick(o, ["imagePrompt", "image_prompt", "prompt", "image", "picture"]),
+      };
+    }),
+  };
+}
+
+export const ThumbnailPlanSchema = z.preprocess(
+  normaliseThumbnailPlan,
+  z.object({
+    thumbnails: z.array(ThumbnailIdeaSchema).length(LIMITS.thumbnailsPerVideo),
+  }),
+);
 export type ThumbnailPlan = z.infer<typeof ThumbnailPlanSchema>;
 
 /** One thumbnail in the manifest. Paths are relative to the project folder. */

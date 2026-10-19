@@ -51,3 +51,20 @@ export function toManifestPath(projectDir: string, absolute: string): string {
 export function fromManifestPath(projectDir: string, rel: string): string {
   return path.join(projectDir, ...rel.split("/"));
 }
+
+/**
+ * Copies the .ttf files of `fontsDir` into `dest` (for libass), skipping files that
+ * are already there with the same size. Re-copying a font FFmpeg may still have
+ * open fails on Windows (EBUSY).
+ */
+export async function ensureFonts(fontsDir: string, dest: string): Promise<void> {
+  await fsp.mkdir(dest, { recursive: true });
+  for (const f of await fsp.readdir(fontsDir)) {
+    if (!f.toLowerCase().endsWith(".ttf")) continue;
+    const from = path.join(fontsDir, f);
+    const to = path.join(dest, f);
+    const [a, b] = await Promise.all([fsp.stat(from), fsp.stat(to).catch(() => undefined)]);
+    if (b && b.size === a.size) continue;
+    await fsp.copyFile(from, to);
+  }
+}

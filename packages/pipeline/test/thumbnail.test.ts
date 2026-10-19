@@ -115,6 +115,15 @@ describe("thumbnail schema and text", () => {
     expect(ThumbnailPlanSchema.safeParse({ thumbnails: [ok, ok] }).success).toBe(false);
   });
 
+  it("accepts the reply shapes SERV sends: a bare list or snake_case fields", () => {
+    const idea = { headline: "THEY *LIED*", image_prompt: "Sam looks shocked at a giant bank" };
+    const bare = ThumbnailPlanSchema.safeParse([idea, idea, idea]);
+    expect(bare.success).toBe(true);
+    expect(bare.data?.thumbnails[0]!.imagePrompt).toBe("Sam looks shocked at a giant bank");
+    const otherKey = ThumbnailPlanSchema.safeParse({ ideas: [idea, idea, idea] });
+    expect(otherKey.success).toBe(true);
+  });
+
   it("highlights the starred word, or the last word when none is starred", () => {
     expect(headlineAssText("they *lied* to you")).toBe("THEY {\\c&H3BD4FF&}LIED{\\c&HFFFFFF&} TO YOU");
     expect(headlineAssText("why you wait")).toBe("WHY YOU {\\c&H3BD4FF&}WAIT");
@@ -152,8 +161,24 @@ describe("thumbnail render (real FFmpeg)", () => {
       expect(stdout.trim()).toBe("mjpeg,1280,720");
       expect((await fsp.stat(file)).size).toBeLessThan(2 * 1024 * 1024);
     }
-    // The text version differs from the clean one, and no .ass file is left behind.
+    // The text version differs from the clean one, and nothing else lands in thumbnails/.
     expect(Buffer.compare(await fsp.readFile(out), await fsp.readFile(clean))).not.toBe(0);
-    expect(await fsp.readdir(path.dirname(out))).not.toContain("thumb-1.ass");
+    expect((await fsp.readdir(path.dirname(out))).sort()).toEqual([
+      "thumb-1-clean.jpg",
+      "thumb-1.jpg",
+      "thumb-1.png",
+    ]);
+
+    // Running again (fonts already copied) works and still leaves no working files behind.
+    await fsp.rm(out);
+    await renderThumbnail({
+      projectDir: dir,
+      imagePath: image,
+      headline: "AGAIN",
+      fontsDir: path.join(ASSETS_DIR, "fonts"),
+      outFile: out,
+      cleanFile: clean,
+    });
+    expect((await fsp.readdir(path.dirname(out))).filter((f) => f.endsWith(".ass"))).toEqual([]);
   }, 30_000);
 });

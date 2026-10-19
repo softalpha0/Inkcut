@@ -64,8 +64,10 @@ export async function runThumbnailStage(ctx: StageContext): Promise<void> {
   }
 
   const size = IMAGE_SIZES["16:9"];
+  const thumbs = m.thumbnails;
   let newImages = 0;
-  await mapLimit(m.thumbnails, LIMITS.thumbnailsPerVideo, async (thumb) => {
+  // Pictures in parallel (network); the text pass one at a time (local FFmpeg, shared font folder).
+  await mapLimit(thumbs, LIMITS.thumbnailsPerVideo, async (thumb) => {
     const files = thumbnailFiles(thumb.index);
     const imageFile = project.path(...files.image.split("/"));
     if (!(await fileExists(imageFile))) {
@@ -81,13 +83,17 @@ export async function runThumbnailStage(ctx: StageContext): Promise<void> {
       newImages++;
     }
     thumb.imagePath = files.image;
+    await project.save();
+  });
 
+  for (const thumb of thumbs) {
+    const files = thumbnailFiles(thumb.index);
     const outFile = project.path(...files.output.split("/"));
     const cleanFile = project.path(...files.clean.split("/"));
     if (!(await fileExists(outFile)) || !(await fileExists(cleanFile))) {
       await ctx.media.renderThumbnail({
         projectDir: project.dir,
-        imagePath: imageFile,
+        imagePath: project.abs(files.image),
         headline: thumb.headline,
         fontsDir: ctx.fontsDir,
         outFile,
@@ -97,7 +103,7 @@ export async function runThumbnailStage(ctx: StageContext): Promise<void> {
     thumb.outputPath = files.output;
     thumb.cleanPath = files.clean;
     await project.save();
-    log.info(`thumbnail ${thumb.index + 1}/${m.thumbnails!.length}`, { headline: thumb.headline });
-  });
+    log.info(`thumbnail ${thumb.index + 1}/${thumbs.length}`, { headline: thumb.headline });
+  }
   log.info("thumbnails done", { newImages });
 }

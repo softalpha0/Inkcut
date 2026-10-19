@@ -1,6 +1,6 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
-import { writeFileAtomic } from "../util/fs.js";
+import { ensureFonts, writeFileAtomic } from "../util/fs.js";
 import { runFfmpeg } from "../util/ffmpeg.js";
 import { CAPTION_FONT_NAME, escapeAssText } from "./captions.js";
 
@@ -82,18 +82,16 @@ function rel(from: string, to: string): string {
  * burn in the headline. Writes the text version and a clean version.
  */
 export async function renderThumbnail(job: ThumbnailRenderJob): Promise<void> {
-  const fontsLocal = path.join(job.projectDir, "render", "fonts");
-  await fsp.mkdir(fontsLocal, { recursive: true });
-  for (const f of await fsp.readdir(job.fontsDir)) {
-    if (f.toLowerCase().endsWith(".ttf"))
-      await fsp.copyFile(path.join(job.fontsDir, f), path.join(fontsLocal, f));
-  }
+  const renderDir = path.join(job.projectDir, "render");
+  const fontsLocal = path.join(renderDir, "fonts");
+  await ensureFonts(job.fontsDir, fontsLocal);
   await fsp.mkdir(path.dirname(job.outFile), { recursive: true });
 
   const base =
     `scale=${THUMBNAIL_WIDTH}:${THUMBNAIL_HEIGHT}:force_original_aspect_ratio=increase,` +
     `crop=${THUMBNAIL_WIDTH}:${THUMBNAIL_HEIGHT},eq=saturation=1.2:contrast=1.06`;
-  const assFile = job.outFile.replace(/\.jpg$/, ".ass");
+  // Working files go in render/, which is never uploaded with the project's assets.
+  const assFile = path.join(renderDir, path.basename(job.outFile).replace(/\.jpg$/, ".ass"));
   await writeFileAtomic(assFile, buildThumbnailAss(job.headline));
 
   const render = async (vf: string, out: string) => {

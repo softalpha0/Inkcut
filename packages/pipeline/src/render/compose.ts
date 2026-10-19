@@ -3,7 +3,7 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { Motion } from "@inkcut/shared";
-import { fileExists, readJson, writeFileAtomic, writeJson } from "../util/fs.js";
+import { ensureFonts, fileExists, readJson, writeFileAtomic, writeJson } from "../util/fs.js";
 import { runFfmpeg } from "../util/ffmpeg.js";
 import type { Logger } from "../util/log.js";
 import { mapLimit } from "../util/concurrency.js";
@@ -209,12 +209,7 @@ export async function renderVideo(job: RenderJob): Promise<string> {
       path.join(renderDir, "captions.ass"),
       buildAss(job.captions.lines, job.captions.ass),
     );
-    const fontsLocal = path.join(renderDir, "fonts");
-    await fsp.mkdir(fontsLocal, { recursive: true });
-    for (const f of await fsp.readdir(job.fontsDir)) {
-      if (f.toLowerCase().endsWith(".ttf"))
-        await fsp.copyFile(path.join(job.fontsDir, f), path.join(fontsLocal, f));
-    }
+    await ensureFonts(job.fontsDir, path.join(renderDir, "fonts"));
   }
 
   const concurrency = job.concurrency ?? Math.max(1, Math.min(4, Math.floor(os.cpus().length / 2)));

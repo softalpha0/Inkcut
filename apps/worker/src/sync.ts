@@ -53,7 +53,10 @@ export async function persist(
   const uploaded: string[] = [];
   for (const rel of await collect(localDir)) {
     const local = path.join(localDir, ...rel.split("/"));
-    const mtime = (await fsp.stat(local)).mtimeMs;
+    // A working file can be removed between listing and upload; it was never needed.
+    const stat = await fsp.stat(local).catch(() => undefined);
+    if (!stat) continue;
+    const mtime = stat.mtimeMs;
     if (snapshot.get(rel) === mtime) continue;
     await assets.upload(BUCKETS.assets, join(prefix, rel), local, contentTypeFor(local));
     snapshot.set(rel, mtime);
