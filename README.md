@@ -1,4 +1,4 @@
-# Inkcut
+﻿# Inkcut
 
 Turn a topic, a script or your own voiceover into a narrated stickman explainer video (MP4).
 Free to use, with daily limits. See [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md) for scope and architecture.
@@ -163,7 +163,12 @@ git push -u origin main
 3. **Project Settings → API**: copy the **Project URL**, the **anon** key and the **service_role** key (secret).
 4. **Authentication → URL Configuration** (after Step 3, when you know your Render address):
    - Site URL: `https://inkcut-web.onrender.com`
-   - Redirect URLs: `https://inkcut-web.onrender.com/auth/callback` and `http://localhost:3000/auth/callback`
+   - Redirect URLs: `https://inkcut-web.onrender.com/**` and `http://localhost:3000/**`
+   - **Authentication → Emails → Templates**: in both **Magic Link** and **Confirm signup**, change the
+     link to `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email` so sign-in links
+     work even when opened on a different device than the one that asked for them.
+   - The built-in email sender only sends 2 emails an hour. For real users add custom SMTP
+     (**Authentication → Emails → SMTP Settings**, e.g. Gmail with an app password).
 5. **Authentication → Providers**: email links work out of the box. Google is optional (needs a Google Cloud OAuth client).
 
 ## Step 3: Render Blueprint (website + queue)
