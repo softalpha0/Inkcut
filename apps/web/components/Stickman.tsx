@@ -23,11 +23,14 @@ const LEGS: Record<Pose, string> = {
 export function Stickman({
   pose = "wave",
   shirt,
+  ink = "var(--color-ink)",
   className,
   size = 120,
 }: {
   pose?: Pose;
   shirt?: string;
+  /** Line colour, e.g. white for a chalkboard look. */
+  ink?: string;
   className?: string;
   size?: number;
 }) {
@@ -39,7 +42,7 @@ export function Stickman({
       className={className}
       aria-hidden="true"
       fill="none"
-      stroke="var(--color-ink)"
+      stroke={ink}
       strokeWidth="4"
       strokeLinecap="round"
       strokeLinejoin="round"

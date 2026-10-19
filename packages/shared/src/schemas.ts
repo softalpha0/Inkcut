@@ -97,6 +97,8 @@ export const StylePresetSchema = z.object({
   negativePrompt: z.string(),
   seed: z.number().int().nonnegative().optional(),
   characterSheet: z.string().optional(),
+  /** Example recurring character for the storyboard prompt, e.g. "Sam: a stick figure with a red scarf". */
+  exampleCharacter: z.string().optional(),
 });
 export type StylePreset = z.infer<typeof StylePresetSchema>;
 
@@ -121,6 +123,8 @@ export const ProjectManifestSchema = z.object({
   updatedAt: z.string(),
   input: ProjectInputSchema,
   styleId: z.string(),
+  /** The user's own description of the look when styleId is "custom". */
+  customStyle: z.string().optional(),
   aspect: AspectSchema,
   voiceId: z.string(),
   captions: z.boolean(),

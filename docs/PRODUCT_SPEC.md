@@ -7,7 +7,7 @@
 
 ## 1. Overview
 
-Inkcut turns a **topic** or a **script** into a narrated, illustrated, faceless explainer video (stickman style first). The user previews the scenes, can redraw any single scene, then **downloads the MP4** and posts it themselves.
+Inkcut turns a **topic** or a **script** into a narrated, illustrated, faceless explainer video in a cartoon style of the user's choice (stickman first, plus cartoon presets and a custom style). The user previews the scenes, can redraw any single scene, then **downloads the MP4** and posts it themselves.
 
 - **Free to use** in v1 (no payments, no credits).
 - **No auto-posting** to YouTube or any platform.
@@ -34,7 +34,7 @@ vsub.io — script/voiceover → scenes → narration → AI-drawn frames in a c
 | 3 | Upload own voiceover | Transcribe with Whisper, use audio as-is |
 | 4 | Script → scenes | SERV splits into scenes with image prompts |
 | 5 | AI voice | Free TTS (Edge TTS) with a few voice options |
-| 6 | Image generation | Stickman style presets, consistent look |
+| 6 | Image generation | Stickman and cartoon style presets, a custom style described in words, consistent look |
 | 7 | Scene editor | View scenes, edit prompt, redraw one scene |
 | 8 | Render | Ken Burns motion, burned-in captions, background music optional |
 | 9 | Aspect ratios | 16:9 (1920×1080) and 9:16 (1080×1920) |
@@ -174,10 +174,17 @@ StylePreset {
   negativePrompt: string;
   seed?: number;              // fixed seed per project for consistency
   characterSheet?: string;    // standard description of recurring characters
+  exampleCharacter?: string;  // example recurring character for the storyboard prompt
 }
 ```
 
 v1 presets: `stickman-classic` (white background, black lines), `stickman-color` (flat colors, simple scenery).
+Added presets: `flat-cartoon`, `whiteboard`, `storybook`, `comic`, `chalkboard`, `paper-cutout`.
+
+**Custom style** (`style_id = 'custom'`): the user describes the look in words (3–200 characters,
+`LIMITS.maxCustomStyleChars`), stored in `projects.custom_style` (migration `0002_custom_style.sql`).
+The description becomes the prompt prefix. Studio, show and character names (Disney, Pixar, Simpsons, …)
+are rejected so Inkcut describes a look instead of copying a protected brand.
 
 ### 5.4 Render (FFmpeg)
 1. For each scene: image → clip of `durationSec` with `zoompan` motion at 30 fps, target resolution.
@@ -195,7 +202,7 @@ Must work on Windows (local dev) and Linux (worker Docker). Use `ffmpeg-static` 
 ```sql
 profiles      (id uuid pk = auth.users.id, created_at)
 projects      (id uuid pk, user_id fk, title, input_mode text, topic text, script text,
-               style_id text, aspect text, voice_id text, captions bool,
+               style_id text, custom_style text, aspect text, voice_id text, captions bool,
                status text, current_stage text, error text,
                output_path text, output_expires_at timestamptz,
                created_at, updated_at)

@@ -75,10 +75,11 @@ async function createLocalProject(row: ProjectRow, workDir: string, deps: Worker
     id: row.id,
     input: inputFor(row, audioExt),
     styleId: row.style_id,
+    ...(row.custom_style ? { customStyle: row.custom_style } : {}),
     aspect: row.aspect,
     voiceId: row.voice_id,
     captions: row.captions,
-    seed: projectSeed(getStyle(row.style_id), row.id),
+    seed: projectSeed(getStyle(row.style_id, row.custom_style ?? undefined), row.id),
     ...(row.animate ? { animate: { enabled: true } } : {}),
   });
   if (row.input_mode === "script") {

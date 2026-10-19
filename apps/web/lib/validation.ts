@@ -1,12 +1,21 @@
-import { AspectSchema, LIMITS, STYLE_OPTIONS, VOICES } from "@inkcut/shared";
+import {
+  AspectSchema,
+  CUSTOM_STYLE_ID,
+  LIMITS,
+  STYLE_OPTIONS,
+  VOICES,
+  customStyleProblem,
+} from "@inkcut/shared";
 import { z } from "zod";
 
-const styleId = z.enum(STYLE_OPTIONS.map((s) => s.id) as [string, ...string[]]);
+const styleId = z.enum([CUSTOM_STYLE_ID, ...STYLE_OPTIONS.map((s) => s.id)] as [string, ...string[]]);
 const voiceId = z.enum(VOICES.map((v) => v.id) as [string, ...string[]]);
 
 const common = {
   title: z.string().trim().max(120).optional(),
   styleId,
+  /** The user's own description of the look; used only with styleId "custom". */
+  customStyle: z.string().trim().max(LIMITS.maxCustomStyleChars).optional(),
   aspect: AspectSchema,
   voiceId,
   captions: z.boolean(),
@@ -16,31 +25,37 @@ const common = {
 export const AUDIO_EXTENSIONS = [".mp3", ".wav", ".m4a"] as const;
 
 /** POST /api/projects body (spec §8 limits applied here). */
-export const CreateProjectSchema = z.discriminatedUnion("mode", [
-  z.object({
-    mode: z.literal("topic"),
-    topic: z.string().trim().min(3, "Describe the topic in a few words").max(300),
-    minutes: z.number().int().min(LIMITS.minVideoMinutes).max(LIMITS.maxVideoMinutes),
-    ...common,
-  }),
-  z.object({
-    mode: z.literal("script"),
-    script: z
-      .string()
-      .trim()
-      .min(20, "The script is too short")
-      .max(
-        LIMITS.maxScriptChars,
-        `Scripts can be up to ${LIMITS.maxScriptChars.toLocaleString("en")} characters`,
-      ),
-    ...common,
-  }),
-  z.object({
-    mode: z.literal("audio"),
-    audioPath: z.string().min(1).max(300),
-    ...common,
-  }),
-]);
+export const CreateProjectSchema = z
+  .discriminatedUnion("mode", [
+    z.object({
+      mode: z.literal("topic"),
+      topic: z.string().trim().min(3, "Describe the topic in a few words").max(300),
+      minutes: z.number().int().min(LIMITS.minVideoMinutes).max(LIMITS.maxVideoMinutes),
+      ...common,
+    }),
+    z.object({
+      mode: z.literal("script"),
+      script: z
+        .string()
+        .trim()
+        .min(20, "The script is too short")
+        .max(
+          LIMITS.maxScriptChars,
+          `Scripts can be up to ${LIMITS.maxScriptChars.toLocaleString("en")} characters`,
+        ),
+      ...common,
+    }),
+    z.object({
+      mode: z.literal("audio"),
+      audioPath: z.string().min(1).max(300),
+      ...common,
+    }),
+  ])
+  .superRefine((v, ctx) => {
+    if (v.styleId !== CUSTOM_STYLE_ID) return;
+    const problem = customStyleProblem(v.customStyle ?? "", LIMITS.maxCustomStyleChars);
+    if (problem) ctx.addIssue({ code: "custom", path: ["customStyle"], message: problem });
+  });
 export type CreateProject = z.infer<typeof CreateProjectSchema>;
 
 /** PATCH /api/scenes/:id body. */

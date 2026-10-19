@@ -77,7 +77,7 @@ export async function runPipeline(opts: RunOptions): Promise<RunResult> {
   const ctx: StageContext = {
     project,
     providers: opts.providers,
-    style: getStyle(project.manifest.styleId),
+    style: getStyle(project.manifest.styleId, project.manifest.customStyle),
     media: opts.media ?? defaultMedia,
     log,
     fontsDir: opts.fontsDir ?? path.join(ASSETS_DIR, "fonts"),

@@ -1,6 +1,6 @@
-﻿# Inkcut
+# Inkcut
 
-Turn a topic, a script or your own voiceover into a narrated stickman explainer video (MP4).
+Turn a topic, a script or your own voiceover into a narrated cartoon explainer video (MP4): stickman, flat cartoon, whiteboard, storybook and more, or a style you describe.
 Free to use, with daily limits. See [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md) for scope and architecture.
 
 ```
@@ -71,6 +71,10 @@ pnpm cli --script .\my-script.txt --style stickman-color --aspect 9:16
 
 # Your own voiceover (.mp3/.wav/.m4a, max 5 min / 25 MB)
 pnpm cli --audio .\voiceover.mp3
+
+# Other looks: --style flat-cartoon | whiteboard | storybook | comic | chalkboard | paper-cutout
+# or describe your own (no studio or show names):
+pnpm cli --topic "How compound interest works" --custom-style "1950s retro cartoon, muted colours"
 
 # Options
 #   --voice en-US-AriaNeural   (en-US-GuyNeural default; also ChristopherNeural, JennyNeural, en-GB-RyanNeural, en-GB-SoniaNeural)
@@ -160,6 +164,7 @@ git push -u origin main
 1. Create a project at supabase.com (pick a region close to Render's Oregon, e.g. **US West**).
 2. **SQL Editor**: paste the _contents_ of `packages/db/migrations/0001_init.sql`
    (`Get-Content packages\db\migrations\0001_init.sql -Raw | Set-Clipboard`) and click **Run**.
+   Then do the same with `packages/db/migrations/0002_custom_style.sql` (adds custom art styles).
 3. **Project Settings → API**: copy the **Project URL**, the **anon** key and the **service_role** key (secret).
 4. **Authentication → URL Configuration** (after Step 3, when you know your Render address):
    - Site URL: `https://inkcut-web.onrender.com`

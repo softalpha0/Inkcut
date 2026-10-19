@@ -7,7 +7,8 @@ import {
   StylePresetSchema,
   makeScenePlanSchema,
 } from "@inkcut/shared";
-import { STYLES } from "../src/styles/index.js";
+import { planMessages } from "../src/llm/prompts.js";
+import { STYLES, buildImagePrompt, getStyle } from "../src/styles/index.js";
 
 const scene = {
   index: 0,
@@ -91,9 +92,39 @@ describe("style presets", () => {
     expect(Object.keys(STYLES).sort()).toEqual(STYLE_OPTIONS.map((s) => s.id).sort());
   });
 
-  it("ships the two v1 presets and they validate", () => {
-    expect(Object.keys(STYLES).sort()).toEqual(["stickman-classic", "stickman-color"]);
-    for (const style of Object.values(STYLES)) expect(StylePresetSchema.parse(style)).toEqual(style);
+  it("ships the stickman and cartoon presets and they validate", () => {
+    expect(Object.keys(STYLES)).toHaveLength(8);
+    for (const style of Object.values(STYLES)) {
+      expect(StylePresetSchema.parse(style)).toEqual(style);
+      expect(style.exampleCharacter).toBeTruthy();
+      expect(style.negativePrompt).toMatch(/text/);
+    }
+  });
+
+  it("builds a custom style from the user's description", () => {
+    const style = getStyle("custom", "1950s retro cartoon, muted colours.");
+    expect(style.id).toBe("custom");
+    const prompt = buildImagePrompt(style, "Sam counts coins at a desk");
+    expect(prompt).toMatch(/^1950s retro cartoon, muted colours, illustration/);
+    expect(prompt).toMatch(/No text/);
+  });
+
+  it("refuses a custom style that is missing, too short or names a studio", () => {
+    expect(() => getStyle("custom")).toThrow(/description/);
+    expect(() => getStyle("custom", "ab")).toThrow(/few words/);
+    expect(() => getStyle("custom", "Pixar style family")).toThrow(/pixar/);
+    expect(() => getStyle("custom", "x".repeat(LIMITS.maxCustomStyleChars + 1))).toThrow(/characters/);
+  });
+
+  it("does not mistake ordinary words for brand names", () => {
+    expect(getStyle("custom", "a calm scenario in an allegory, legolike blocks").id).toBe("custom");
+  });
+
+  it("tells the storyboard which style it is drawing for", () => {
+    const system = planMessages(["One line."], getStyle("chalkboard"))[0]!.content;
+    expect(system).toMatch(/"Chalkboard" style/);
+    expect(system).toMatch(/Ada: a chalk-drawn cartoon girl/);
+    expect(system).not.toMatch(/stickman explainer/);
   });
 });
 

@@ -3,12 +3,14 @@ import path from "node:path";
 import { Command, InvalidArgumentError } from "commander";
 import {
   AspectSchema,
+  CUSTOM_STYLE_ID,
   DEFAULT_STYLE_ID,
   DEFAULT_VOICE_ID,
   LIMITS,
   VOICES,
   type Aspect,
   type ProjectInput,
+  type StylePreset,
 } from "@inkcut/shared";
 import { defaultOutDir, loadEnv } from "./env.js";
 import { runPipeline } from "./pipeline.js";
@@ -26,6 +28,7 @@ interface CliOptions {
   topic?: string;
   minutes: number;
   style: string;
+  customStyle?: string;
   aspect: Aspect;
   voice: string;
   captions: boolean;
@@ -83,7 +86,13 @@ function fail(message: string): never {
 async function createProjectFromOptions(opts: CliOptions, outDir: string): Promise<Project> {
   const modes = [opts.topic, opts.script, opts.audio].filter((v) => v !== undefined).length;
   if (modes !== 1) fail("Give exactly one of --topic, --script or --audio (or --resume <projectId>).");
-  getStyle(opts.style);
+  const styleId = opts.customStyle !== undefined ? CUSTOM_STYLE_ID : opts.style;
+  let style: StylePreset;
+  try {
+    style = getStyle(styleId, opts.customStyle);
+  } catch (err) {
+    fail(errorMessage(err));
+  }
   if (!VOICES.some((v) => v.id === opts.voice)) {
     fail(`Unknown voice "${opts.voice}". Available: ${VOICES.map((v) => v.id).join(", ")}`);
   }
@@ -134,11 +143,12 @@ async function createProjectFromOptions(opts: CliOptions, outDir: string): Promi
   const project = await Project.create(outDir, {
     id,
     input,
-    styleId: opts.style,
+    styleId,
+    ...(opts.customStyle !== undefined ? { customStyle: opts.customStyle.trim() } : {}),
     aspect: opts.aspect,
     voiceId: opts.voice,
     captions: opts.captions,
-    seed: projectSeed(getStyle(opts.style), id),
+    seed: projectSeed(style, id),
     ...(animateSettings(opts) ? { animate: animateSettings(opts)! } : {}),
   });
   if (copyIn) {
@@ -154,10 +164,11 @@ async function main(): Promise<void> {
   loadEnv();
   const program = new Command()
     .name("inkcut")
-    .description("Turn a topic, script or voiceover into a narrated stickman explainer video.")
+    .description("Turn a topic, script or voiceover into a narrated cartoon explainer video.")
     .option("--topic <text>", "generate the script from a topic")
     .option("--minutes <n>", "target length for --topic (1-5)", parseMinutes, 1)
     .option("--style <id>", `style preset (${Object.keys(STYLES).join(", ")})`, DEFAULT_STYLE_ID)
+    .option("--custom-style <text>", 'describe your own art style, e.g. "1950s retro cartoon, muted colours"')
     .option("--aspect <ratio>", "16:9 or 9:16", parseAspect, "16:9" as Aspect)
     .option("--voice <id>", "Edge TTS voice", DEFAULT_VOICE_ID)
     .option("--no-captions", "do not burn in captions")
@@ -202,7 +213,7 @@ async function main(): Promise<void> {
     `  input  : ${m.input.mode}${m.input.mode === "topic" ? ` "${m.input.topic}" (${m.input.minutes} min)` : ""}`,
   );
   console.log(
-    `  style  : ${m.styleId}   aspect: ${m.aspect}   voice: ${m.voiceId}   captions: ${m.captions ? "on" : "off"}`,
+    `  style  : ${m.customStyle ? `custom (${m.customStyle})` : m.styleId}   aspect: ${m.aspect}   voice: ${m.voiceId}   captions: ${m.captions ? "on" : "off"}`,
   );
   if (m.animate?.enabled) {
     console.log(

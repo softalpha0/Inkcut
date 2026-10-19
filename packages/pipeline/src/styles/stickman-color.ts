@@ -9,4 +9,5 @@ export const stickmanColor: StylePreset = {
     "text, letters, words, numbers, watermark, signature, speech bubble, photorealistic, 3d render, heavy shading, gradient, clutter",
   characterSheet:
     "Stick figures have a round white head outlined in black, two dot eyes, a simple expressive mouth, and single-line black limbs.",
+  exampleCharacter: "Sam: a stick figure with a red scarf",
 };

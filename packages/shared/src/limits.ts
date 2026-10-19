@@ -10,6 +10,8 @@ export const LIMITS = {
   maxVideoMinutes: 5,
   /** Longest pasted script, characters. */
   maxScriptChars: 6000,
+  /** Longest custom art-style description, characters. */
+  maxCustomStyleChars: 200,
   /** Single-scene redraws a user may run per day. */
   redrawsPerUserPerDay: 30,
   /** Longest uploaded voiceover, seconds. */

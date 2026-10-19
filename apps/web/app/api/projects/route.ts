@@ -1,4 +1,4 @@
-import { LIMITS } from "@inkcut/shared";
+import { CUSTOM_STYLE_ID, LIMITS } from "@inkcut/shared";
 import type { ProjectRow } from "@inkcut/db";
 import { CreateProjectSchema, isAdmin, titleFor, usageSummary } from "@/lib/validation";
 import { currentUser, fail, json, readJson } from "@/lib/server/http";
@@ -43,6 +43,8 @@ export async function POST(req: Request) {
     script: input.mode === "script" ? input.script.slice(0, LIMITS.maxScriptChars) : null,
     audio_path: input.mode === "audio" ? input.audioPath : null,
     style_id: input.styleId,
+    // Only sent for custom styles, so preset videos work even before migration 0002 is run.
+    ...(input.styleId === CUSTOM_STYLE_ID ? { custom_style: input.customStyle ?? null } : {}),
     aspect: input.aspect,
     voice_id: input.voiceId,
     captions: input.captions,

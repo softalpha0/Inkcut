@@ -11,6 +11,8 @@ export interface ProjectRow {
   minutes: number | null;
   audio_path: string | null;
   style_id: string;
+  /** The user's own style description when style_id is "custom" (migration 0002). */
+  custom_style?: string | null;
   aspect: Aspect;
   voice_id: string;
   captions: boolean;

@@ -1,4 +1,4 @@
-﻿import fsp from "node:fs/promises";
+import fsp from "node:fs/promises";
 import { FPS, LIMITS, SCENE_GAP_SEC, type Scene } from "@inkcut/shared";
 import { sceneFileName } from "../project.js";
 import { mapLimit } from "../util/concurrency.js";
@@ -117,5 +117,9 @@ export async function runAnimateStage(ctx: StageContext): Promise<void> {
   if (accountError) {
     log.warn("animation stopped; the remaining scenes keep zoom/pan", { error: accountError });
   }
-  log.info("animate done", { newClips: newItems, failed: failed.length, skipped: accountError !== undefined });
+  log.info("animate done", {
+    newClips: newItems,
+    failed: failed.length,
+    skipped: accountError !== undefined,
+  });
 }

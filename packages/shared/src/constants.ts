@@ -50,5 +50,89 @@ export interface StyleOption {
 export const STYLE_OPTIONS: readonly StyleOption[] = [
   { id: "stickman-classic", name: "Stickman classic", description: "Black ink on white, clean and minimal." },
   { id: "stickman-color", name: "Stickman color", description: "Flat pastel colors and simple scenery." },
+  { id: "flat-cartoon", name: "Flat cartoon", description: "Bright, modern explainer characters." },
+  { id: "whiteboard", name: "Whiteboard doodle", description: "Marker drawings on a whiteboard." },
+  { id: "storybook", name: "Storybook", description: "Soft watercolor, great for stories and kids." },
+  { id: "comic", name: "Comic book", description: "Bold ink, strong colors and halftone dots." },
+  { id: "chalkboard", name: "Chalkboard", description: "White and colored chalk on a dark board." },
+  { id: "paper-cutout", name: "Paper cut-out", description: "Layered craft paper with soft shadows." },
 ];
+
+/** Style id for a look the user describes in their own words. */
+export const CUSTOM_STYLE_ID = "custom";
+
+/**
+ * Studio, show and character names a custom style may not use. Inkcut describes a
+ * look ("flat sitcom cartoon") instead of copying a protected brand.
+ */
+const PROTECTED_STYLE_NAMES = [
+  "disney",
+  "pixar",
+  "dreamworks",
+  "ghibli",
+  "miyazaki",
+  "simpsons",
+  "family guy",
+  "south park",
+  "rick and morty",
+  "futurama",
+  "spongebob",
+  "nickelodeon",
+  "cartoon network",
+  "looney tunes",
+  "warner bros",
+  "marvel",
+  "dc comics",
+  "batman",
+  "superman",
+  "spider-man",
+  "spiderman",
+  "avengers",
+  "star wars",
+  "mickey",
+  "minnie",
+  "pokemon",
+  "pokémon",
+  "nintendo",
+  "mario",
+  "zelda",
+  "sanrio",
+  "hello kitty",
+  "peanuts",
+  "snoopy",
+  "garfield",
+  "minecraft",
+  "lego",
+  "roblox",
+  "fortnite",
+  "naruto",
+  "one piece",
+  "dragon ball",
+  "studio trigger",
+  "kurzgesagt",
+  "bluey",
+  "peppa pig",
+  "paw patrol",
+  "adventure time",
+  "gravity falls",
+  "toei",
+  "illumination",
+  "minions",
+];
+
+/** Why a custom style description is not accepted, or undefined when it is fine. */
+export function customStyleProblem(text: string, maxChars: number): string | undefined {
+  const t = text.trim();
+  if (t.length < 3) return "Describe the art style in a few words";
+  if (t.length > maxChars) return `Keep the style description under ${maxChars} characters`;
+  const lower = t.toLowerCase();
+  const brand = PROTECTED_STYLE_NAMES.find((name) =>
+    new RegExp(`(^|[^a-z])${name.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&")}s?($|[^a-z])`).test(lower),
+  );
+  if (brand) {
+    return `Please describe the look instead of naming "${brand}" (for example "bright 3D family cartoon")`;
+  }
+  return undefined;
+}
+
 export const DEFAULT_STYLE_ID = "stickman-classic";

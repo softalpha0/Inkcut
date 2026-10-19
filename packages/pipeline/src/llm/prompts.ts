@@ -6,7 +6,7 @@ export function scriptMessages(topic: string, targetWords: number): LlmMessage[]
     {
       role: "system",
       content: [
-        "You write narration scripts for faceless, illustrated stickman explainer videos (history, psychology, science).",
+        "You write narration scripts for faceless, illustrated cartoon explainer videos (history, psychology, science, finance, stories).",
         "The narration is read aloud by a text-to-speech voice, word for word.",
         "",
         "Rules:",
@@ -28,7 +28,7 @@ export function planMessages(chunks: string[], style: StylePreset): LlmMessage[]
     {
       role: "system",
       content: [
-        "You are the storyboard artist for a narrated stickman explainer video.",
+        `You are the storyboard artist for a narrated, illustrated explainer video drawn in the "${style.name}" style.`,
         "The narration is already split into numbered scenes. For EVERY scene, describe one illustration shown while that line is spoken.",
         "",
         `Art style (added automatically later, do NOT repeat it): ${style.name}: ${style.promptPrefix}`,
@@ -37,7 +37,7 @@ export function planMessages(chunks: string[], style: StylePreset): LlmMessage[]
           : "",
         "",
         "Rules:",
-        "- First define the recurring characters in `characters`: one sentence each, with a short name and 1-2 fixed visual traits (e.g. 'Sam: a stick figure with a red scarf'). Keep it under 60 words.",
+        `- First define the recurring characters in \`characters\`: one sentence each, with a short name and 1-2 fixed visual traits that suit the art style (e.g. '${style.exampleCharacter ?? "Sam: a cartoon man with a red scarf"}'). Keep it under 60 words.`,
         "- Every imagePrompt that shows a recurring character must describe them with exactly the same words as in `characters`.",
         "- Each imagePrompt shows ONE clear moment: who, doing what, where, with which key objects. 15 to 45 words. Concrete and literal; no metaphors the artist can't draw.",
         "- Absolutely no text, letters, numbers, signs, labels, speech bubbles or captions in the image.",

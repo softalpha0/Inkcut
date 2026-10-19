@@ -31,6 +31,7 @@ export interface NewProjectOptions {
   id?: string;
   input: ProjectInput;
   styleId: string;
+  customStyle?: string;
   aspect: Aspect;
   voiceId: string;
   captions: boolean;
@@ -65,6 +66,7 @@ export class Project {
       updatedAt: now,
       input: opts.input,
       styleId: opts.styleId,
+      ...(opts.customStyle ? { customStyle: opts.customStyle } : {}),
       aspect: opts.aspect,
       voiceId: opts.voiceId,
       captions: opts.captions,

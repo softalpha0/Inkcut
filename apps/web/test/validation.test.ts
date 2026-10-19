@@ -91,4 +91,41 @@ describe("helpers", () => {
     );
     expect(t).toBe("one two three four five six seven eight…");
   });
+
+  it("accepts a custom style with a description and stores it trimmed", () => {
+    const r = CreateProjectSchema.safeParse({
+      mode: "topic",
+      topic: "abc",
+      minutes: 1,
+      ...common,
+      styleId: "custom",
+      customStyle: "  1950s retro cartoon, muted colours  ",
+    });
+    expect(r.success).toBe(true);
+    expect(r.data?.customStyle).toBe("1950s retro cartoon, muted colours");
+  });
+
+  it("rejects a custom style without a description or naming a studio", () => {
+    const base = { mode: "topic", topic: "abc", minutes: 1, ...common, styleId: "custom" };
+    expect(CreateProjectSchema.safeParse(base).success).toBe(false);
+    const brand = CreateProjectSchema.safeParse({ ...base, customStyle: "Disney princess look" });
+    expect(brand.success).toBe(false);
+    expect(brand.error?.issues[0]?.message).toMatch(/describe the look/i);
+  });
+
+  it("accepts every preset style", () => {
+    for (const styleId of [
+      "flat-cartoon",
+      "whiteboard",
+      "storybook",
+      "comic",
+      "chalkboard",
+      "paper-cutout",
+    ]) {
+      expect(
+        CreateProjectSchema.safeParse({ mode: "topic", topic: "abc", minutes: 1, ...common, styleId })
+          .success,
+      ).toBe(true);
+    }
+  });
 });

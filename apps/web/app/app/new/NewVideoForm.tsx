@@ -1,8 +1,17 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { DEFAULT_VOICE_ID, LIMITS, STYLE_OPTIONS, VOICES, type Aspect } from "@inkcut/shared";
+import {
+  CUSTOM_STYLE_ID,
+  DEFAULT_VOICE_ID,
+  LIMITS,
+  STYLE_OPTIONS,
+  VOICES,
+  customStyleProblem,
+  type Aspect,
+} from "@inkcut/shared";
 import { Stickman } from "@/components/Stickman";
+import { StyleSwatch } from "@/components/StyleSwatch";
 import { Button, Card } from "@/components/ui";
 import { audioExtension } from "@/lib/validation";
 import { browserSupabase } from "@/lib/supabase/client";
@@ -46,6 +55,7 @@ export function NewVideoForm({ canAnimate, videosLeft }: { canAnimate: boolean; 
   const [script, setScript] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [styleId, setStyleId] = useState(STYLE_OPTIONS[0]!.id);
+  const [customStyle, setCustomStyle] = useState("");
   const [aspect, setAspect] = useState<Aspect>("16:9");
   const [voiceId, setVoiceId] = useState(DEFAULT_VOICE_ID);
   const [captions, setCaptions] = useState(true);
@@ -72,6 +82,11 @@ export function NewVideoForm({ canAnimate, videosLeft }: { canAnimate: boolean; 
     e.preventDefault();
     setError(null);
     try {
+      const isCustom = styleId === CUSTOM_STYLE_ID;
+      if (isCustom) {
+        const problem = customStyleProblem(customStyle, LIMITS.maxCustomStyleChars);
+        if (problem) throw new Error(problem);
+      }
       let audioPath: string | undefined;
       if (mode === "audio") {
         if (!file) throw new Error("Choose your voiceover file first.");
@@ -86,7 +101,14 @@ export function NewVideoForm({ canAnimate, videosLeft }: { canAnimate: boolean; 
       }
 
       setBusy("Creating your video…");
-      const common = { styleId, aspect, voiceId, captions, animate: canAnimate && animate };
+      const common = {
+        styleId,
+        ...(isCustom ? { customStyle: customStyle.trim() } : {}),
+        aspect,
+        voiceId,
+        captions,
+        animate: canAnimate && animate,
+      };
       const body =
         mode === "topic"
           ? { mode, topic, minutes, ...common }
@@ -208,23 +230,20 @@ export function NewVideoForm({ canAnimate, videosLeft }: { canAnimate: boolean; 
 
       <Card>
         <h2 className="font-display text-lg">2. How should it look and sound?</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {STYLE_OPTIONS.map((s) => (
+        <span className="mt-4 block text-sm font-semibold">Art style</span>
+        <div className="mt-1 grid gap-3 sm:grid-cols-2">
+          {[
+            ...STYLE_OPTIONS,
+            { id: CUSTOM_STYLE_ID, name: "Custom style", description: "Describe any cartoon look you want." },
+          ].map((s) => (
             <button
               key={s.id}
               type="button"
+              aria-pressed={styleId === s.id}
               onClick={() => setStyleId(s.id)}
               className={`flex items-center gap-3 rounded-xl border-2 border-ink p-3 text-left ${styleId === s.id ? "bg-marker" : "bg-white hover:bg-paper-2"}`}
             >
-              <span
-                className={`grid size-14 shrink-0 place-items-end justify-center rounded-lg border-2 border-ink ${s.id === "stickman-color" ? "bg-[#eaf4ff]" : "bg-white"}`}
-              >
-                <Stickman
-                  pose="wave"
-                  size={48}
-                  shirt={s.id === "stickman-color" ? "var(--color-coral)" : undefined}
-                />
-              </span>
+              <StyleSwatch styleId={s.id} />
               <span>
                 <span className="block font-display">{s.name}</span>
                 <span className="text-xs text-ink-2">{s.description}</span>
@@ -232,6 +251,30 @@ export function NewVideoForm({ canAnimate, videosLeft }: { canAnimate: boolean; 
             </button>
           ))}
         </div>
+
+        {styleId === CUSTOM_STYLE_ID ? (
+          <div className="mt-4">
+            <label htmlFor="custom-style" className="text-sm font-semibold">
+              Describe the look
+            </label>
+            <textarea
+              id="custom-style"
+              className={`${field} mt-1 min-h-24`}
+              required
+              minLength={3}
+              maxLength={LIMITS.maxCustomStyleChars}
+              placeholder="1950s retro cartoon, muted colours, thick outlines"
+              value={customStyle}
+              onChange={(e) => setCustomStyle(e.target.value)}
+            />
+            <p className="mt-1 flex justify-between gap-3 text-xs text-muted">
+              <span>Describe colours, lines and mood. Don&apos;t name studios or shows.</span>
+              <span className="shrink-0">
+                {customStyle.length} / {LIMITS.maxCustomStyleChars}
+              </span>
+            </p>
+          </div>
+        ) : null}
 
         <div className="mt-5 grid gap-5 sm:grid-cols-2">
           <div>

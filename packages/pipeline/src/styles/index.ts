@@ -1,14 +1,53 @@
-import { StylePresetSchema, type StylePreset } from "@inkcut/shared";
+import {
+  CUSTOM_STYLE_ID,
+  LIMITS,
+  StylePresetSchema,
+  customStyleProblem,
+  type StylePreset,
+} from "@inkcut/shared";
+import { chalkboard } from "./chalkboard.js";
+import { comic } from "./comic.js";
+import { flatCartoon } from "./flat-cartoon.js";
+import { paperCutout } from "./paper-cutout.js";
 import { stickmanClassic } from "./stickman-classic.js";
 import { stickmanColor } from "./stickman-color.js";
+import { storybook } from "./storybook.js";
+import { whiteboard } from "./whiteboard.js";
 
 export const STYLES: Readonly<Record<string, StylePreset>> = Object.fromEntries(
-  [stickmanClassic, stickmanColor].map((s) => [s.id, StylePresetSchema.parse(s)]),
+  [stickmanClassic, stickmanColor, flatCartoon, whiteboard, storybook, comic, chalkboard, paperCutout].map(
+    (s) => [s.id, StylePresetSchema.parse(s)],
+  ),
 );
 
-export function getStyle(id: string): StylePreset {
+/** A preset built from the user's own description of the look ("1950s retro cartoon, muted colours"). */
+export function customStyle(description: string): StylePreset {
+  const problem = customStyleProblem(description, LIMITS.maxCustomStyleChars);
+  if (problem) throw new Error(`Custom style not accepted: ${problem}`);
+  const look = description.trim().replace(/[.\s]+$/, "");
+  return StylePresetSchema.parse({
+    id: CUSTOM_STYLE_ID,
+    name: "Custom style",
+    promptPrefix: `${look}, illustration for an explainer video, clear simple composition, consistent character design`,
+    negativePrompt: "text, letters, words, numbers, watermark, signature, speech bubble, clutter",
+    characterSheet:
+      "Recurring characters keep exactly the same face, hair, outfit and colours in every scene.",
+    exampleCharacter: "Sam: a young man with curly red hair and a green jacket",
+  });
+}
+
+/** The preset for a style id; "custom" needs the user's description. */
+export function getStyle(id: string, custom?: string): StylePreset {
+  if (id === CUSTOM_STYLE_ID) {
+    if (!custom) throw new Error('The "custom" style needs a description of the look');
+    return customStyle(custom);
+  }
   const style = STYLES[id];
-  if (!style) throw new Error(`Unknown style "${id}". Available: ${Object.keys(STYLES).join(", ")}`);
+  if (!style) {
+    throw new Error(
+      `Unknown style "${id}". Available: ${[...Object.keys(STYLES), CUSTOM_STYLE_ID].join(", ")}`,
+    );
+  }
   return style;
 }
 

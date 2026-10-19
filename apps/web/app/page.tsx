@@ -1,6 +1,7 @@
-import { LIMITS } from "@inkcut/shared";
+import { CUSTOM_STYLE_ID, LIMITS, STYLE_OPTIONS } from "@inkcut/shared";
 import { Logo } from "@/components/Logo";
 import { SceneCard, Stickman } from "@/components/Stickman";
+import { StyleSwatch } from "@/components/StyleSwatch";
 import { ButtonLink } from "@/components/ui";
 
 const STEPS = [
@@ -16,7 +17,7 @@ const STEPS = [
   },
   {
     title: "Voice, drawings, captions",
-    body: "Every scene gets a natural AI voice, a stickman illustration and word-by-word captions.",
+    body: "Every scene gets a natural AI voice, an illustration in your chosen style and word-by-word captions.",
     pose: "walk" as const,
   },
   {
@@ -48,8 +49,8 @@ const FEATURES = [
     body: "Upload a recording and Inkcut cuts scenes on your sentences and draws to match.",
   },
   {
-    title: "Two styles to start",
-    body: "Classic black-ink stickman on white, or flat pastel color with simple scenery.",
+    title: `${STYLE_OPTIONS.length} styles, or your own`,
+    body: "Stickman, flat cartoon, whiteboard, storybook, comic, chalkboard, paper cut-out, or describe any cartoon look.",
   },
 ];
 
@@ -73,6 +74,10 @@ const FAQ = [
   {
     q: "How long do you keep my video?",
     a: `${LIMITS.outputRetentionHours} hours after it is rendered, then it is deleted. Download it before then.`,
+  },
+  {
+    q: "Can I use my own art style?",
+    a: 'Yes. Choose "Custom style" and describe the look in your own words, like "1950s retro cartoon, muted colours". Describe colours, lines and mood rather than naming a studio or show.',
   },
   {
     q: "What kinds of videos work best?",
@@ -217,7 +222,7 @@ export default function Landing() {
               <span className="size-2 rounded-full bg-mint" /> Free · no credit card
             </p>
             <h1 className="font-display text-4xl leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
-              Turn any idea into a <span className="marker">stickman explainer</span> video.
+              Turn any idea into a <span className="marker">cartoon explainer</span> video.
             </h1>
             <p className="mt-5 max-w-xl text-lg text-ink-2">
               Type a topic, paste a script or upload your voice. Inkcut writes the narration, records the
@@ -286,9 +291,24 @@ export default function Landing() {
           <div className="mx-auto max-w-6xl px-4 py-20">
             <h2 className="font-display text-3xl sm:text-4xl">Pick a look</h2>
             <p className="mt-3 max-w-2xl text-ink-2">
-              Every scene in a video shares the same style, seed and character descriptions, so it looks like
-              one story.
+              Stickman, cartoon, whiteboard, storybook and more, or describe your own. Every scene in a video
+              shares the same style and characters, so it looks like one story.
             </p>
+            <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              {[
+                ...STYLE_OPTIONS,
+                { id: CUSTOM_STYLE_ID, name: "Your own style", description: "Describe any cartoon look." },
+              ].map((s) => (
+                <li
+                  key={s.id}
+                  className="flex items-center gap-3 rounded-xl border-2 border-ink bg-white p-2.5"
+                  title={s.description}
+                >
+                  <StyleSwatch styleId={s.id} />
+                  <span className="font-display text-sm leading-tight">{s.name}</span>
+                </li>
+              ))}
+            </ul>
             <div className="mt-10 grid gap-6 md:grid-cols-2">
               <SceneCard label="Stickman classic: black ink on white">
                 <Stickman pose="point" size={170} />
