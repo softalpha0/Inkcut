@@ -1,5 +1,6 @@
-import { createServerClient } from "@supabase/ssr";
+﻿import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { publicOrigin } from "./lib/origin";
 
 /**
  * Refreshes the Supabase session cookie on every app/API request and sends
@@ -26,8 +27,7 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user && request.nextUrl.pathname.startsWith("/app")) {
-    const login = request.nextUrl.clone();
-    login.pathname = "/login";
+    const login = new URL("/login", publicOrigin(request));
     login.search = `?next=${encodeURIComponent(request.nextUrl.pathname)}`;
     return NextResponse.redirect(login);
   }
