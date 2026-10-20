@@ -32,6 +32,8 @@ export const JobDataSchema = z.discriminatedUnion("type", [
     headline: ThumbnailHeadlineSchema.optional(),
     redraw: z.boolean().default(false),
   }),
+  /** Make whatever is missing of the thumbnails and YouTube details (older videos). */
+  z.object({ type: z.literal("extras"), projectId: z.string().uuid() }),
   /** Render the MP4 from the current scenes. */
   z.object({ type: z.literal("render"), projectId: z.string().uuid() }),
   /** Delete outputs and assets past their retention time. */

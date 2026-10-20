@@ -108,7 +108,7 @@ describe("animate stage", () => {
     const total = project.manifest.scenes.length;
     const second = run(project);
     await second.promise;
-    expect(second.fakes.llm.calls).toBe(1); // thumbnails
+    expect(second.fakes.llm.calls).toBe(2); // thumbnails + YouTube details
     expect(second.fakes.tts.calls).toBe(0);
     expect(second.fakes.images.calls).toBe(LIMITS.thumbnailsPerVideo);
     expect(second.fakes.video.calls).toBe(total - 2);

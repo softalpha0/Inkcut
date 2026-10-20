@@ -57,11 +57,11 @@ describe("resume", () => {
     const reloaded = await Project.load(path.dirname(project.dir), project.id);
     const second = run(reloaded);
     const result = await second.promise;
-    // Only the thumbnail stage (never reached before) calls SERV, plus its pictures.
-    expect(second.fakes.llm.calls).toBe(1);
+    // Only the thumbnail stage (never reached before) calls SERV: thumbnail ideas + YouTube details.
+    expect(second.fakes.llm.calls).toBe(2);
     expect(second.fakes.tts.calls).toBe(0);
     expect(second.fakes.images.calls).toBe(scenes - 2 + THUMBS);
-    expect(result.apiCalls).toEqual({ fal: scenes - 2 + THUMBS, serv: 1 });
+    expect(result.apiCalls).toEqual({ fal: scenes - 2 + THUMBS, serv: 2 });
     expect(result.outputPath).toBe(reloaded.path("final.mp4"));
     expect(reloaded.manifest.completedStages).toEqual([
       "script",
@@ -82,7 +82,7 @@ describe("resume", () => {
 
     const second = run(project);
     await second.promise;
-    expect(second.fakes.llm.calls).toBe(1); // thumbnails
+    expect(second.fakes.llm.calls).toBe(2); // thumbnails + YouTube details
     expect(second.fakes.tts.calls).toBe(scenes - 3);
     expect(second.fakes.images.calls).toBe(scenes + THUMBS);
   });
@@ -102,7 +102,7 @@ describe("resume", () => {
     await fsp.writeFile(project.path("script.txt"), script);
     const { promise, fakes } = run(project);
     await promise;
-    expect(fakes.llm.calls).toBe(2); // plan + thumbnails, no script
+    expect(fakes.llm.calls).toBe(3); // plan + thumbnails + YouTube details, no script
     expect(project.manifest.scenes.map((s) => s.narration).join(" ")).toBe(script);
   });
 
@@ -127,6 +127,6 @@ describe("resume", () => {
     const second = run(project, { stt });
     await second.promise;
     expect(stt.calls).toBe(1);
-    expect(second.fakes.llm.calls).toBe(1); // thumbnails only
+    expect(second.fakes.llm.calls).toBe(2); // thumbnails + YouTube details only
   });
 });

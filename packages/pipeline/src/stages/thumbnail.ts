@@ -1,12 +1,23 @@
-import { IMAGE_SIZES, LIMITS, ThumbnailPlanSchema, type Thumbnail } from "@inkcut/shared";
-import { thumbnailMessages } from "../llm/prompts.js";
+import fsp from "node:fs/promises";
+import {
+  IMAGE_SIZES,
+  LIMITS,
+  ThumbnailPlanSchema,
+  YoutubeKitSchema,
+  type Thumbnail,
+  type YoutubeKit,
+} from "@inkcut/shared";
+import { thumbnailMessages, youtubeKitMessages } from "../llm/prompts.js";
 import { completeJson } from "../llm/structured.js";
 import { buildImagePrompt } from "../styles/index.js";
 import { mapLimit } from "../util/concurrency.js";
 import { fileExists } from "../util/fs.js";
-import { checkForcedFailure, type StageContext } from "./context.js";
+import { errorMessage } from "../util/retry.js";
+import { ForcedFailure, checkForcedFailure, type StageContext } from "./context.js";
 
 export const THUMBNAILS_DIR = "thumbnails";
+/** Plain-text copy of the YouTube details, next to final.mp4. */
+export const YOUTUBE_FILE = "youtube.txt";
 /** Narration sent to the LLM for thumbnail ideas, characters. */
 const NARRATION_CHARS = 2500;
 
@@ -22,6 +33,33 @@ export function thumbnailFiles(index: number): { image: string; output: string; 
 /** Distinct, stable seed per thumbnail so the three pictures differ from each other. */
 export function thumbnailSeed(projectSeed: number, index: number, attempt = 0): number {
   return (projectSeed + 7919 * (index + 1) + 104_729 * attempt) % 2_147_483_647;
+}
+
+function narrationFor(ctx: StageContext): string {
+  return ctx.project.manifest.scenes
+    .map((s) => s.narration)
+    .join(" ")
+    .slice(0, NARRATION_CHARS);
+}
+
+/** The YouTube details as copy-and-paste text (youtube.txt). */
+export function youtubeText(kit: YoutubeKit): string {
+  return [
+    "TITLES (one per thumbnail, for Test & compare)",
+    ...kit.titles.map((t, i) => `${i + 1}. ${t}`),
+    "",
+    "DESCRIPTION",
+    kit.description,
+    "",
+    kit.hashtags.join(" "),
+    "",
+    "TAGS",
+    kit.tags.join(", "),
+    "",
+    "PINNED COMMENT",
+    kit.pinnedComment,
+    "",
+  ].join("\n");
 }
 
 /** A short title for the LLM: the topic, or the opening of the narration. */
@@ -44,10 +82,7 @@ export async function runThumbnailStage(ctx: StageContext): Promise<void> {
   if (!m.thumbnails?.length) {
     checkForcedFailure(ctx, "thumbnail", 0);
     log.info("writing thumbnail ideas with SERV");
-    const narration = m.scenes
-      .map((s) => s.narration)
-      .join(" ")
-      .slice(0, NARRATION_CHARS);
+    const narration = narrationFor(ctx);
     const plan = await completeJson(
       ctx.providers.llm(),
       thumbnailMessages(videoTitle(ctx), narration, style, m.characters),
@@ -62,6 +97,28 @@ export async function runThumbnailStage(ctx: StageContext): Promise<void> {
     }));
     await project.save();
   }
+
+  if (!m.youtube) {
+    // Titles, description and tags. Nice to have: a failure here never blocks the thumbnails.
+    try {
+      log.info("writing YouTube title, description and tags with SERV");
+      m.youtube = await completeJson(
+        ctx.providers.llm(),
+        youtubeKitMessages(
+          videoTitle(ctx),
+          narrationFor(ctx),
+          m.thumbnails.map((t) => t.headline),
+        ),
+        YoutubeKitSchema,
+        { log, label: "youtube" },
+      );
+      await project.save();
+    } catch (err) {
+      if (err instanceof ForcedFailure) throw err;
+      log.warn("could not write the YouTube details; thumbnails continue", { error: errorMessage(err) });
+    }
+  }
+  if (m.youtube) await fsp.writeFile(project.path(YOUTUBE_FILE), youtubeText(m.youtube));
 
   const size = IMAGE_SIZES["16:9"];
   const thumbs = m.thumbnails;

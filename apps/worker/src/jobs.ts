@@ -52,6 +52,8 @@ const ONLY: Record<ProjectJob["type"], StageName[] | undefined> = {
   // Also makes thumbnails for videos created before thumbnails existed (no-op when present).
   render: ["render", "thumbnail"],
   thumbnail: ["thumbnail"],
+  // Older videos: makes whatever is missing of the thumbnails and YouTube details.
+  extras: ["thumbnail"],
 };
 
 /** Status after a job succeeds: jobs that end with a render are done; scene edits need a new render. */
@@ -64,7 +66,8 @@ function doneStatus(data: ProjectJob, row: ProjectRow): ProjectStatus {
     case "revoice":
       return "draft";
     case "thumbnail":
-      // A thumbnail edit does not touch the video.
+    case "extras":
+      // Thumbnails and YouTube details do not touch the video.
       return row.output_path ? "done" : "draft";
   }
 }

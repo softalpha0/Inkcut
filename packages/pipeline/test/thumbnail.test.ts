@@ -1,12 +1,12 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { LIMITS, ThumbnailPlanSchema, type Aspect } from "@inkcut/shared";
+import { LIMITS, ThumbnailPlanSchema, YoutubeKitSchema, type Aspect } from "@inkcut/shared";
 import { ASSETS_DIR } from "../src/env.js";
 import { runPipeline } from "../src/pipeline.js";
 import { Project } from "../src/project.js";
 import { buildThumbnailAss, headlineAssText, renderThumbnail } from "../src/render/thumbnail.js";
-import { thumbnailFiles } from "../src/stages/thumbnail.js";
+import { YOUTUBE_FILE, thumbnailFiles } from "../src/stages/thumbnail.js";
 import { ffprobePath, runFfmpeg, runProcess } from "../src/util/ffmpeg.js";
 import { silentLogger } from "../src/util/log.js";
 import { ApiCallCounter } from "../src/util/metrics.js";
@@ -103,6 +103,62 @@ describe("thumbnail stage", () => {
     const { promise, fakes } = run(project, ["thumbnail"]);
     fakes.llm.queued.push("nope", "still nope", "nope again");
     await expect(promise).rejects.toThrow();
+  });
+});
+
+describe("YouTube details", () => {
+  it("are written with the thumbnails: one title per thumbnail, description, tags, pinned comment", async () => {
+    const project = await newProject();
+    await run(project).promise;
+    const kit = project.manifest.youtube!;
+    expect(kit.titles).toHaveLength(LIMITS.thumbnailsPerVideo);
+    expect(kit.tags).toContain("procrastination");
+    expect(kit.hashtags).toEqual(["#procrastination", "#psychology", "#productivity"]);
+    const text = await fsp.readFile(project.path(YOUTUBE_FILE), "utf8");
+    expect(text).toMatch(/^TITLES/);
+    expect(text).toContain(`1. ${kit.titles[0]}`);
+    expect(text).toContain(kit.pinnedComment);
+  });
+
+  it("never block the thumbnails when they fail", async () => {
+    const project = await newProject();
+    const { promise, fakes } = run(project);
+    const chat = fakes.llm.chat.bind(fakes.llm);
+    fakes.llm.chat = async (messages) => {
+      const system = messages.find((m) => m.role === "system")?.content ?? "";
+      return system.includes("YouTube growth expert") ? "no json" : chat(messages);
+    };
+    await promise;
+    expect(project.manifest.youtube).toBeUndefined();
+    expect(project.manifest.thumbnails).toHaveLength(LIMITS.thumbnailsPerVideo);
+    expect(project.manifest.completedStages).toContain("thumbnail");
+  });
+
+  it("are added to an older video that has thumbnails, without new pictures", async () => {
+    const project = await newProject();
+    await run(project).promise;
+    delete project.manifest.youtube;
+    await project.save();
+    const again = run(project, ["thumbnail"]);
+    await again.promise;
+    expect(again.fakes.llm.calls).toBe(1);
+    expect(again.fakes.images.calls).toBe(0);
+    expect((project.manifest as { youtube?: { titles: string[] } }).youtube?.titles).toHaveLength(
+      LIMITS.thumbnailsPerVideo,
+    );
+  });
+
+  it("accept tags as one comma-separated string and fix hashtags without #", () => {
+    const kit = YoutubeKitSchema.parse({
+      titles: ["Why You Wait", "Your Brain Lies", "The 5 Minute Fix"],
+      description: "A hook line that makes people curious.\n\nWhat you will learn in this video.",
+      tags: "procrastination, psychology, procrastination, productivity",
+      hashtags: ["##procrastination", "self improvement"],
+      pinned_comment: "What are you putting off today?",
+    });
+    expect(kit.tags).toEqual(["procrastination", "psychology", "productivity"]);
+    expect(kit.hashtags).toEqual(["#procrastination", "#selfimprovement"]);
+    expect(kit.pinnedComment).toBe("What are you putting off today?");
   });
 });
 

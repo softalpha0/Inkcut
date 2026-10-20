@@ -97,3 +97,31 @@ export function thumbnailMessages(
     { role: "user", content: `Video title: ${title}\n\nNarration:\n${narration}` },
   ];
 }
+
+/** YouTube upload details; titles[i] is written to pair with thumbnail headline i. */
+export function youtubeKitMessages(title: string, narration: string, headlines: string[]): LlmMessage[] {
+  return [
+    {
+      role: "system",
+      content: [
+        "You are a YouTube growth expert writing the upload details for a narrated, illustrated video.",
+        "",
+        `titles: exactly ${headlines.length} titles. Title i is shown together with thumbnail i in YouTube's A/B test, so it must fit that thumbnail's headline without repeating it word for word:`,
+        ...headlines.map((h, i) => `  thumbnail ${i + 1} headline: "${h.replace(/\*/g, "")}"`),
+        "  Each title: under 60 characters if possible (never over 90), curiosity or a clear benefit, honest (the video must deliver it), Title Case, no emojis, no ALL CAPS, no hashtags.",
+        "description: 3 short paragraphs in plain text.",
+        "  1) The first two lines are a hook that makes people want to watch (they show before 'more').",
+        "  2) What the viewer will learn or experience, without spoiling the ending.",
+        "  3) A friendly line asking viewers to subscribe and comment.",
+        "  Do not mention AI, tools or how the video was made. No links. No hashtags inside the description (they are added separately).",
+        "tags: 10 to 15 search phrases people would type, from broad to specific, lowercase, no # signs.",
+        "hashtags: exactly 3 short hashtags for the topic, each starting with #.",
+        "pinnedComment: one short question (under 150 characters) that gets viewers to reply with their own experience or opinion. One emoji at most.",
+        "",
+        "Reply with ONLY a JSON object in exactly this shape (no markdown):",
+        '{"titles": ["...", "...", "..."], "description": "...", "tags": ["...", "..."], "hashtags": ["#...", "#...", "#..."], "pinnedComment": "..."}',
+      ].join("\n"),
+    },
+    { role: "user", content: `Video topic: ${title}\n\nNarration:\n${narration}` },
+  ];
+}

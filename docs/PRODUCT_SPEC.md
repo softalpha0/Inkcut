@@ -212,6 +212,14 @@ DB column. In a full run a thumbnail failure only logs a warning (the video is s
 headline re-renders the text only (free); "New picture" redraws one image and counts as a redraw.
 A render job also creates thumbnails for older videos that have none.
 
+### 5.6 YouTube details
+In the same stage, SERV writes the upload details (`youtube` in `project.json`, plus `youtube.txt`):
+three titles (title *i* pairs with thumbnail *i* for Test & compare), a description (hook in the first
+two lines, no mention of how it was made), 10–15 tags, 3 hashtags and a pinned-comment question.
+zod-validated (tags as a list or one comma-separated string). A failure only logs a warning and never
+blocks the thumbnails. The video page shows them with copy buttons; an `extras` job adds whatever is
+missing (thumbnails and/or details) to older videos without re-rendering.
+
 ---
 
 ## 6. Data model (Supabase Postgres)
@@ -251,6 +259,7 @@ usage_daily   (user_id fk, day date, videos_started int, redraws int, pk(user_id
 | GET | `/api/projects/:id/download` | Signed URL for MP4 |
 | POST | `/api/projects/:id/thumbnails/:index` | New headline and/or new picture for one thumbnail |
 | GET | `/api/projects/:id/thumbnails/:index/download` | Thumbnail JPEG (`?clean=1` without text) |
+| POST | `/api/projects/:id/extras` | Make missing thumbnails / YouTube details for a finished video |
 | POST | `/api/uploads/voiceover` | Signed upload URL |
 
 Progress: worker updates `projects.status/current_stage`; web subscribes via Supabase Realtime.

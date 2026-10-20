@@ -18,6 +18,7 @@ import { Project, newProjectId } from "./project.js";
 import { providersFromEnv } from "./providers.js";
 import { parseFailAt } from "./stages/context.js";
 import { SCRIPT_FILE } from "./stages/script.js";
+import { YOUTUBE_FILE } from "./stages/thumbnail.js";
 import { STYLES, getStyle, projectSeed } from "./styles/index.js";
 import { probeDuration } from "./util/ffmpeg.js";
 import { createLogger } from "./util/log.js";
@@ -238,6 +239,9 @@ async function main(): Promise<void> {
     for (const t of project.manifest.thumbnails ?? []) {
       if (t.outputPath)
         console.log(`  thumbnail: ${project.abs(t.outputPath)}  "${t.headline.replace(/\*/g, "")}"`);
+    }
+    if (project.manifest.youtube) {
+      console.log(`  YouTube  : ${project.path(YOUTUBE_FILE)} (titles, description, tags)`);
     }
     console.log(`  API calls: ${formatCalls(result.apiCalls)}`);
   } catch (err) {

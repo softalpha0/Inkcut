@@ -161,6 +161,60 @@ export const ThumbnailSchema = ThumbnailIdeaSchema.extend({
 });
 export type Thumbnail = z.infer<typeof ThumbnailSchema>;
 
+const asStringList = (v: unknown) =>
+  typeof v === "string"
+    ? v
+        .split(/[,\n]/)
+        .map((t) => t.trim())
+        .filter(Boolean)
+    : v;
+
+/**
+ * YouTube upload details for one video (spec §5.6). titles[i] pairs with
+ * thumbnail i for YouTube's "Test & compare".
+ */
+export const YoutubeKitSchema = z.preprocess(
+  (value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+    const o = value as Record<string, unknown>;
+    return {
+      titles: o.titles,
+      description: o.description,
+      tags: asStringList(o.tags),
+      hashtags: asStringList(o.hashtags),
+      pinnedComment: o.pinnedComment ?? o.pinned_comment ?? o.comment,
+    };
+  },
+  z.object({
+    titles: z
+      .array(z.string().trim().min(5).max(LIMITS.maxYoutubeTitleChars))
+      .length(LIMITS.thumbnailsPerVideo),
+    description: z.string().trim().min(40).max(4500),
+    tags: z
+      .array(
+        z
+          .string()
+          .trim()
+          .transform((t) => t.replace(/^#/, ""))
+          .pipe(z.string().min(2).max(40)),
+      )
+      .min(3)
+      .transform((tags) => [...new Set(tags)].slice(0, LIMITS.maxYoutubeTags)),
+    hashtags: z
+      .array(
+        z
+          .string()
+          .trim()
+          .transform((h) => `#${h.replace(/^#+/, "").replace(/\s+/g, "")}`)
+          .pipe(z.string().min(3).max(40)),
+      )
+      .max(5)
+      .transform((h) => h.slice(0, 3)),
+    pinnedComment: z.string().trim().min(5).max(300),
+  }),
+);
+export type YoutubeKit = z.infer<typeof YoutubeKitSchema>;
+
 /** Spec §5.3. */
 export const StylePresetSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
@@ -223,6 +277,8 @@ export const ProjectManifestSchema = z.object({
   scenes: z.array(SceneSchema),
   /** YouTube thumbnails (thumbnail stage). */
   thumbnails: z.array(ThumbnailSchema).optional(),
+  /** YouTube titles, description, tags and pinned comment (thumbnail stage). */
+  youtube: YoutubeKitSchema.optional(),
   outputPath: z.string().optional(),
   runs: z.array(
     z.object({

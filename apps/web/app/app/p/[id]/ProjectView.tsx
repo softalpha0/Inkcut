@@ -23,6 +23,14 @@ interface ThumbnailView {
   cleanUrl: string | null;
 }
 
+interface YoutubeView {
+  titles: string[];
+  description: string;
+  tags: string[];
+  hashtags: string[];
+  pinnedComment: string;
+}
+
 interface ProjectData {
   project: {
     id: string;
@@ -37,6 +45,7 @@ interface ProjectData {
   };
   videoUrl: string | null;
   thumbnails: ThumbnailView[];
+  youtube: YoutubeView | null;
   scenes: SceneView[];
 }
 
@@ -107,7 +116,7 @@ export function ProjectView({ id }: { id: string }) {
     );
   }
 
-  const { project, scenes, videoUrl, thumbnails } = data;
+  const { project, scenes, videoUrl, thumbnails, youtube } = data;
   const vertical = project.aspect === "9:16";
   const stages = [...STAGES[project.input_mode]!];
   if (project.animate) stages.splice(stages.indexOf("rendering"), 0, "animating");
@@ -215,15 +224,18 @@ export function ProjectView({ id }: { id: string }) {
         </div>
       ) : null}
 
-      {project.status === "done" && thumbnails.length === 0 && scenes.length > 0 ? (
+      {project.status === "done" && (thumbnails.length === 0 || !youtube) && scenes.length > 0 ? (
         <Card className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="font-display text-lg">Get YouTube thumbnails</p>
+            <p className="font-display text-lg">Get it ready for YouTube</p>
             <p className="text-sm text-ink-2">
-              Three click-worthy thumbnails for this video. Takes about a minute.
+              {thumbnails.length === 0 ? "Three click-worthy thumbnails plus titles" : "Titles"}, description,
+              tags and a pinned comment. Takes about a minute.
             </p>
           </div>
-          <Button onClick={() => void act(`/api/projects/${project.id}/render`)}>Make thumbnails</Button>
+          <Button onClick={() => void act(`/api/projects/${project.id}/extras`)}>
+            {thumbnails.length === 0 ? "Make thumbnails & details" : "Write YouTube details"}
+          </Button>
         </Card>
       ) : null}
 
@@ -241,6 +253,7 @@ export function ProjectView({ id }: { id: string }) {
                 key={`${t.index}-${t.headline}-${t.url ?? ""}`}
                 projectId={project.id}
                 thumb={t}
+                title={youtube?.titles[t.index] ?? null}
                 disabled={active || project.status === "expired"}
                 act={act}
               />
@@ -248,6 +261,8 @@ export function ProjectView({ id }: { id: string }) {
           </div>
         </section>
       ) : null}
+
+      {youtube && !active ? <YoutubeDetails kit={youtube} /> : null}
 
       {scenes.length > 0 ? (
         <section>
@@ -383,11 +398,14 @@ function SceneEditor({
 function ThumbnailEditor({
   projectId,
   thumb,
+  title,
   disabled,
   act,
 }: {
   projectId: string;
   thumb: ThumbnailView;
+  /** The YouTube title written to go with this thumbnail. */
+  title: string | null;
   disabled: boolean;
   act: (url: string, method?: string, body?: unknown) => Promise<boolean>;
 }) {
@@ -410,6 +428,17 @@ function ThumbnailEditor({
         </span>
       </div>
       <div className="space-y-3 p-4">
+        {title ? (
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold uppercase tracking-wide text-muted">
+                Title for this thumbnail
+              </span>
+              <CopyButton text={title} />
+            </div>
+            <p className="mt-1 font-semibold leading-snug">{title}</p>
+          </div>
+        ) : null}
         <label className="block text-xs font-bold uppercase tracking-wide text-muted">
           Headline
           <input
@@ -449,5 +478,82 @@ function ThumbnailEditor({
         </div>
       </div>
     </article>
+  );
+}
+
+function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard blocked (e.g. insecure context): the text is still on screen to select.
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => void copy()}
+      className="shrink-0 rounded-md border-2 border-ink bg-white px-2 py-0.5 text-xs font-bold hover:bg-paper-2"
+    >
+      {copied ? "Copied ✓" : label}
+    </button>
+  );
+}
+
+/** Titles, description, tags and pinned comment, ready to paste into YouTube Studio. */
+function YoutubeDetails({ kit }: { kit: YoutubeView }) {
+  const description = `${kit.description}\n\n${kit.hashtags.join(" ")}`;
+  const tags = kit.tags.join(", ");
+  const block = "rounded-xl border-2 border-ink bg-white p-4";
+  const heading = "flex items-center justify-between gap-2";
+  const label = "text-xs font-bold uppercase tracking-wide text-muted";
+
+  return (
+    <section>
+      <h2 className="font-display text-2xl">YouTube details</h2>
+      <p className="mt-1 max-w-3xl text-sm text-ink-2">
+        Copy these into YouTube Studio. Each title goes with the thumbnail of the same number in{" "}
+        <strong>A/B Testing</strong>.
+      </p>
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <div className={block}>
+          <span className={label}>Titles</span>
+          <ol className="mt-2 space-y-2">
+            {kit.titles.map((t, i) => (
+              <li key={i} className="flex items-start justify-between gap-3">
+                <span className="font-semibold leading-snug">
+                  {i + 1}. {t}
+                </span>
+                <CopyButton text={t} />
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div className={block}>
+          <div className={heading}>
+            <span className={label}>Pinned comment</span>
+            <CopyButton text={kit.pinnedComment} />
+          </div>
+          <p className="mt-2">{kit.pinnedComment}</p>
+        </div>
+        <div className={`${block} md:col-span-2`}>
+          <div className={heading}>
+            <span className={label}>Description</span>
+            <CopyButton text={description} />
+          </div>
+          <p className="mt-2 whitespace-pre-line text-sm">{description}</p>
+        </div>
+        <div className={`${block} md:col-span-2`}>
+          <div className={heading}>
+            <span className={label}>Tags</span>
+            <CopyButton text={tags} />
+          </div>
+          <p className="mt-2 text-sm text-ink-2">{tags}</p>
+        </div>
+      </div>
+    </section>
   );
 }

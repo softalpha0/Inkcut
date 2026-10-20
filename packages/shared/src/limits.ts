@@ -18,6 +18,10 @@ export const LIMITS = {
   maxThumbnailHeadlineChars: 32,
   /** Most words in a thumbnail headline. */
   maxThumbnailHeadlineWords: 5,
+  /** YouTube title length (YouTube allows 100; shorter titles show in full on phones). */
+  maxYoutubeTitleChars: 100,
+  /** YouTube tags per video. */
+  maxYoutubeTags: 20,
   /** Single-scene redraws a user may run per day. */
   redrawsPerUserPerDay: 30,
   /** Longest uploaded voiceover, seconds. */

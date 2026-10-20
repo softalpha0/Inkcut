@@ -98,7 +98,7 @@ pnpm cli --topic "How compound interest works" --custom-style "1950s retro carto
 #   --out D:\videos            (default: .\out)
 ```
 
-The video is written to `out\<projectId>\final.mp4`, with three YouTube thumbnails in `out\<projectId>\thumbnails\` (`thumb-1.jpg` … and `-clean` versions without text).
+The video is written to `out\<projectId>\final.mp4`, with three YouTube thumbnails in `out\<projectId>\thumbnails\` (`thumb-1.jpg` … and `-clean` versions without text) and the YouTube titles, description and tags in `out\<projectId>\youtube.txt`.
 
 ### Animated scenes (optional, paid)
 

@@ -83,7 +83,8 @@ describe("worker jobs", () => {
     expect(scenes.length).toBeGreaterThan(3);
     expect(scenes[0]!.image_path).toBe(`${USER}/${PID}/images/000.png`);
     expect(await exists(BUCKETS.assets, scenes[0]!.audio_path!)).toBe(true);
-    expect(runs[0]!.llm.calls).toBe(3); // script, plan, thumbnails
+    expect(runs[0]!.llm.calls).toBe(4); // script, plan, thumbnails, YouTube details
+    expect(await exists(BUCKETS.assets, `${USER}/${PID}/youtube.txt`)).toBe(true);
     expect(await exists(BUCKETS.assets, `${USER}/${PID}/thumbnails/thumb-1.jpg`)).toBe(true);
     expect(await exists(BUCKETS.assets, `${USER}/${PID}/thumbnails/thumb-3-clean.jpg`)).toBe(true);
   });
@@ -103,7 +104,7 @@ describe("worker jobs", () => {
     expect(projects.projects.get(PID)!.status).toBe("done");
     const retry = runs[1]!;
     expect(retry.tts.calls).toBe(0);
-    expect(retry.llm.calls).toBe(1); // thumbnails, never reached before
+    expect(retry.llm.calls).toBe(2); // thumbnails + YouTube details, never reached before
     expect(retry.images.calls).toBe(projects.scenes.get(PID)!.length + LIMITS.thumbnailsPerVideo);
   });
 
@@ -206,6 +207,24 @@ describe("worker jobs", () => {
     expect(projects.projects.get(PID)!.status).toBe("done");
   });
 
+  it("extras: adds YouTube details to a finished video without touching its video or thumbnails", async () => {
+    const { projects, deps, runs, root } = await setup();
+    projects.add({ id: PID, user_id: USER, input_mode: "topic", topic: "Focus", minutes: 1 });
+    await handleJob({ type: "generate", projectId: PID }, deps);
+    const stored = path.join(root, "storage", BUCKETS.assets, USER, PID);
+    const manifestFile = path.join(stored, "project.json");
+    const manifest = JSON.parse(await fsp.readFile(manifestFile, "utf8")) as Record<string, unknown>;
+    delete manifest.youtube;
+    await fsp.writeFile(manifestFile, JSON.stringify(manifest));
+
+    await handleJob({ type: "extras", projectId: PID }, deps);
+    const run = runs[1]!;
+    expect(run.llm.calls).toBe(1);
+    expect(run.images.calls + run.tts.calls).toBe(0);
+    expect(projects.projects.get(PID)!.status).toBe("done");
+    expect(await fsp.readFile(path.join(stored, "youtube.txt"), "utf8")).toMatch(/^TITLES/);
+  });
+
   it("marks videos left running by a stopped worker as failed, but not queued or recent ones", async () => {
     const { projects, deps } = await setup();
     const old = "2026-01-01T00:00:00.000Z";
@@ -258,7 +277,7 @@ describe("worker jobs", () => {
     const script = fakeScript(60);
     projects.add({ id: PID, user_id: USER, input_mode: "script", script });
     await handleJob({ type: "generate", projectId: PID }, deps);
-    expect(runs[0]!.llm.calls).toBe(2); // plan + thumbnails
+    expect(runs[0]!.llm.calls).toBe(3); // plan + thumbnails + YouTube details
     expect(
       projects.scenes
         .get(PID)!

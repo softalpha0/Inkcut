@@ -1,6 +1,12 @@
 import "server-only";
 import { BUCKETS, assetsPrefix, type ProjectRow, type SceneRow } from "@inkcut/db";
-import { ACTIVE_STATUSES, ThumbnailSchema, type Thumbnail } from "@inkcut/shared";
+import {
+  ACTIVE_STATUSES,
+  ThumbnailSchema,
+  YoutubeKitSchema,
+  type Thumbnail,
+  type YoutubeKit,
+} from "@inkcut/shared";
 import { z } from "zod";
 import { utcDay, type UsageToday } from "../validation";
 import { adminSupabase } from "../supabase/admin";
@@ -109,20 +115,35 @@ export async function signAssetUrl(path: string, download?: string): Promise<str
   return data?.signedUrl ?? null;
 }
 
-const ManifestThumbnailsSchema = z.object({ thumbnails: z.array(ThumbnailSchema).optional() });
+const ManifestExtrasSchema = z.object({
+  thumbnails: z.array(ThumbnailSchema).optional(),
+  youtube: z.unknown().optional(),
+});
 
-/** The project's thumbnails, read from its saved project.json (the worker keeps it in storage). */
-export async function readThumbnails(project: Pick<ProjectRow, "id" | "user_id">): Promise<Thumbnail[]> {
+/**
+ * The project's thumbnails and YouTube details, read from its saved project.json
+ * (the worker keeps it in storage). Missing or unreadable parts come back empty.
+ */
+export async function readExtras(
+  project: Pick<ProjectRow, "id" | "user_id">,
+): Promise<{ thumbnails: Thumbnail[]; youtube: YoutubeKit | null }> {
+  const empty = { thumbnails: [], youtube: null };
   const { data, error } = await adminSupabase()
     .storage.from(BUCKETS.assets)
     .download(`${assetsPrefix(project.user_id, project.id)}/project.json`);
-  if (error || !data) return [];
+  if (error || !data) return empty;
   try {
-    const parsed = ManifestThumbnailsSchema.safeParse(JSON.parse(await data.text()));
-    return parsed.success ? (parsed.data.thumbnails ?? []) : [];
+    const parsed = ManifestExtrasSchema.safeParse(JSON.parse(await data.text()));
+    if (!parsed.success) return empty;
+    const youtube = YoutubeKitSchema.safeParse(parsed.data.youtube);
+    return { thumbnails: parsed.data.thumbnails ?? [], youtube: youtube.success ? youtube.data : null };
   } catch {
-    return [];
+    return empty;
   }
+}
+
+export async function readThumbnails(project: Pick<ProjectRow, "id" | "user_id">): Promise<Thumbnail[]> {
+  return (await readExtras(project)).thumbnails;
 }
 
 /** Storage path of one thumbnail file (relative manifest path → bucket path). */

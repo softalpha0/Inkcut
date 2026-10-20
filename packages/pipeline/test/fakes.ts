@@ -52,6 +52,16 @@ export class FakeLlm implements LlmClient {
     if (queued !== undefined) return queued;
     const system = messages.find((m) => m.role === "system")?.content ?? "";
     const firstUser = messages.find((m) => m.role === "user")?.content ?? "";
+    if (system.includes("YouTube growth expert")) {
+      return JSON.stringify({
+        titles: ["Why You Wait Until Tomorrow", "Your Brain Lies To You", "The 5 Minute Fix That Works"],
+        description:
+          "You are not lazy. Your brain is protecting you from a bad feeling.\n\nHere is what really happens when you put things off, and how to break the loop.\n\nSubscribe for more and tell us what you are avoiding today.",
+        tags: "procrastination, why we procrastinate, psychology, productivity tips, motivation",
+        hashtags: ["procrastination", "#psychology", "#productivity"],
+        pinnedComment: "What is the one thing you have been putting off? 👀",
+      });
+    }
     if (system.includes("YouTube thumbnails")) {
       return JSON.stringify({
         thumbnails: ["WHY YOU *WAIT*", "YOUR BRAIN *LIES*", "THE 5 MINUTE *FIX*"].map((headline, i) => ({
