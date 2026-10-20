@@ -1,4 +1,5 @@
 import type { ProjectRow, SceneRow } from "@inkcut/db";
+import type { ProjectStatus } from "@inkcut/shared";
 
 export type ProjectPatch = Partial<
   Pick<ProjectRow, "status" | "current_stage" | "error" | "output_path" | "output_expires_at">
@@ -15,6 +16,12 @@ export interface ProjectStore {
   replaceScenes(projectId: string, scenes: SceneInput[]): Promise<void>;
   /** Projects whose output expired before `nowIso` and are not yet cleaned up. */
   listExpired(nowIso: string, limit: number): Promise<Pick<ProjectRow, "id" | "user_id" | "audio_path">[]>;
+  /** Projects in one of `statuses` whose row was last updated before `beforeIso`. */
+  listStuck(
+    statuses: readonly ProjectStatus[],
+    beforeIso: string,
+    limit: number,
+  ): Promise<Pick<ProjectRow, "id">[]>;
 }
 
 /** File storage access the worker needs (service role). */

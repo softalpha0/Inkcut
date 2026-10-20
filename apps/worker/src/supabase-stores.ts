@@ -2,6 +2,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import type { ProjectRow, SceneRow, SupabaseClient } from "@inkcut/db";
+import type { ProjectStatus } from "@inkcut/shared";
 import type { AssetStore, ProjectPatch, ProjectStore, SceneInput } from "./stores.js";
 
 function check<T>(res: { data: T; error: { message: string } | null }, what: string): T {
@@ -45,6 +46,16 @@ export class SupabaseProjectStore implements ProjectStore {
       .lt("output_expires_at", nowIso)
       .limit(limit);
     return (check(res, "list expired") ?? []) as Pick<ProjectRow, "id" | "user_id" | "audio_path">[];
+  }
+
+  async listStuck(statuses: readonly ProjectStatus[], beforeIso: string, limit: number) {
+    const res = await this.db
+      .from("projects")
+      .select("id")
+      .in("status", [...statuses])
+      .lt("updated_at", beforeIso)
+      .limit(limit);
+    return (check(res, "list stuck") ?? []) as Pick<ProjectRow, "id">[];
   }
 }
 

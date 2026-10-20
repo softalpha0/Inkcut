@@ -3,7 +3,7 @@ import { Redis } from "ioredis";
 import { createServiceClient } from "@inkcut/db";
 import { createLogger, errorMessage, loadEnv, providersFromEnv } from "@inkcut/pipeline";
 import { JobDataSchema, QUEUE_NAME, type JobData } from "@inkcut/shared";
-import { handleJob } from "./jobs.js";
+import { handleJob, markJobFailed, recoverStuckProjects } from "./jobs.js";
 import { SupabaseAssetStore, SupabaseProjectStore } from "./supabase-stores.js";
 
 function env(name: string, ...fallbacks: string[]): string {
@@ -43,7 +43,16 @@ async function main(): Promise<void> {
     },
     { connection: redisConnection(redisUrl), concurrency, lockDuration: 5 * 60_000 },
   );
-  worker.on("failed", (job, err) => log.warn("job failed", { id: job?.id, error: errorMessage(err) }));
+  worker.on("failed", (job, err) => {
+    log.warn("job failed", { id: job?.id, error: errorMessage(err) });
+    // Our handler records its own failures; this catches the ones BullMQ decides (e.g. stalled jobs).
+    const parsed = JobDataSchema.safeParse(job?.data);
+    if (parsed.success) {
+      markJobFailed(parsed.data, errorMessage(err), deps).catch((e: unknown) =>
+        log.warn("could not record the failure", { error: errorMessage(e) }),
+      );
+    }
+  });
   worker.on("error", (err) => log.error("worker error", { error: errorMessage(err) }));
 
   // Hourly cleanup of expired outputs (spec §8: 48 h retention).
@@ -52,6 +61,11 @@ async function main(): Promise<void> {
     "cleanup",
     { every: 60 * 60_000 },
     { name: "cleanup", data: { type: "cleanup" }, opts: { removeOnComplete: 10, removeOnFail: 50 } },
+  );
+
+  // Videos left "running" by a previous worker that was closed mid-job.
+  await recoverStuckProjects(deps).catch((e: unknown) =>
+    log.warn("could not check for stopped videos", { error: errorMessage(e) }),
   );
 
   log.info("worker ready", { queue: QUEUE_NAME, concurrency });

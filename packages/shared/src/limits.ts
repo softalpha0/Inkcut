@@ -32,6 +32,10 @@ export const LIMITS = {
   maxAnimatedScenesPerVideo: 70,
   /** Longest wait for one image-to-video job, ms. */
   animateJobTimeoutMs: 10 * 60 * 1000,
+  /** A running video with no progress for this long is treated as stopped (worker closed or crashed). */
+  stuckJobMinutes: 60,
+  /** The same for the animate stage, which can legitimately take longer. */
+  stuckAnimateMinutes: 240,
   /** Retries after an LLM reply fails schema validation. */
   llmValidationRetries: 2,
   /** Retries after a failed network call (timeouts, 5xx, 429). */

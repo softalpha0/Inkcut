@@ -5,7 +5,7 @@ import type { ApiCallCounter } from "@inkcut/pipeline";
 import { silentLogger } from "@inkcut/pipeline";
 import { BUCKETS } from "@inkcut/db";
 import { LIMITS } from "@inkcut/shared";
-import { handleJob, runCleanup, type WorkerDeps } from "../src/jobs.js";
+import { handleJob, markJobFailed, recoverStuckProjects, runCleanup, type WorkerDeps } from "../src/jobs.js";
 import { LocalAssetStore } from "../src/local-assets.js";
 import { MemoryProjectStore } from "./memory-store.js";
 import {
@@ -203,6 +203,53 @@ describe("worker jobs", () => {
         },
       },
     );
+    expect(projects.projects.get(PID)!.status).toBe("done");
+  });
+
+  it("marks videos left running by a stopped worker as failed, but not queued or recent ones", async () => {
+    const { projects, deps } = await setup();
+    const old = "2026-01-01T00:00:00.000Z";
+    const ids = [
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+      "33333333-3333-4333-8333-333333333333",
+      "44444444-4444-4444-8444-444444444444",
+    ];
+    projects.add({ id: ids[0]!, user_id: USER, input_mode: "topic", status: "rendering", updated_at: old });
+    projects.add({ id: ids[1]!, user_id: USER, input_mode: "topic", status: "queued", updated_at: old });
+    projects.add({
+      id: ids[2]!,
+      user_id: USER,
+      input_mode: "topic",
+      status: "rendering",
+      updated_at: "2026-01-01T01:50:00.000Z",
+    });
+    projects.add({
+      id: ids[3]!,
+      user_id: USER,
+      input_mode: "topic",
+      status: "animating",
+      updated_at: "2026-01-01T00:30:00.000Z",
+    });
+    const recovered = await recoverStuckProjects({ ...deps, now: () => new Date("2026-01-01T02:00:00Z") });
+    expect(recovered).toBe(1);
+    expect(projects.projects.get(ids[0]!)!.status).toBe("failed");
+    expect(projects.projects.get(ids[0]!)!.error).toMatch(/Press Retry/);
+    expect(projects.projects.get(ids[1]!)!.status).toBe("queued"); // still waiting in the queue
+    expect(projects.projects.get(ids[2]!)!.status).toBe("rendering"); // recent progress
+    expect(projects.projects.get(ids[3]!)!.status).toBe("animating"); // animation gets longer
+  });
+
+  it("records a job BullMQ failed outside the handler (stalled) on the project", async () => {
+    const { projects, deps } = await setup();
+    projects.add({ id: PID, user_id: USER, input_mode: "topic", status: "drawing" });
+    await markJobFailed({ type: "generate", projectId: PID }, "job stalled more than allowable limit", deps);
+    expect(projects.projects.get(PID)!.status).toBe("failed");
+    expect(projects.projects.get(PID)!.error).toMatch(/worker stopped/);
+
+    // A finished project is left alone.
+    projects.projects.get(PID)!.status = "done";
+    await markJobFailed({ type: "generate", projectId: PID }, "late failure", deps);
     expect(projects.projects.get(PID)!.status).toBe("done");
   });
 

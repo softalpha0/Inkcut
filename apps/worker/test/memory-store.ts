@@ -1,4 +1,5 @@
 import type { ProjectRow, SceneRow } from "@inkcut/db";
+import type { ProjectStatus } from "@inkcut/shared";
 import type { ProjectPatch, ProjectStore, SceneInput } from "../src/stores.js";
 
 /** In-memory ProjectStore that records every status change. */
@@ -40,7 +41,7 @@ export class MemoryProjectStore implements ProjectStore {
   async updateProject(id: string, patch: ProjectPatch) {
     const row = this.projects.get(id);
     if (!row) return;
-    Object.assign(row, patch);
+    Object.assign(row, patch, { updated_at: new Date().toISOString() });
     if (patch.status) this.statusLog.push(patch.status);
   }
 
@@ -60,5 +61,12 @@ export class MemoryProjectStore implements ProjectStore {
       .filter((p) => p.status !== "expired" && p.output_expires_at && p.output_expires_at < nowIso)
       .slice(0, limit)
       .map((p) => ({ id: p.id, user_id: p.user_id, audio_path: p.audio_path }));
+  }
+
+  async listStuck(statuses: readonly ProjectStatus[], beforeIso: string, limit: number) {
+    return [...this.projects.values()]
+      .filter((p) => statuses.includes(p.status) && p.updated_at < beforeIso)
+      .slice(0, limit)
+      .map((p) => ({ id: p.id }));
   }
 }

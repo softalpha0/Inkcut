@@ -20,6 +20,7 @@ import {
   type Providers,
 } from "@inkcut/pipeline";
 import {
+  ACTIVE_STATUSES,
   LIMITS,
   STAGE_STATUS,
   type JobData,
@@ -275,6 +276,50 @@ export async function runProjectJob(data: ProjectJob, deps: WorkerDeps): Promise
   }
 }
 
+const STOPPED_ERROR = "The worker stopped while making this video. Press Retry; finished steps are kept.";
+
+/** Statuses that mean a worker was actively running the job (queued jobs are still waiting in Redis). */
+const RUNNING: readonly ProjectStatus[] = ACTIVE_STATUSES.filter((s) => s !== "queued");
+
+/**
+ * Projects left "running" by a worker that was closed, crashed or lost its connection
+ * mid-job: no progress for LIMITS.stuckJobMinutes (stuckAnimateMinutes while animating).
+ * Marked failed so the page shows Retry and the user can start new videos again.
+ */
+export async function recoverStuckProjects(deps: WorkerDeps): Promise<number> {
+  const log = deps.log ?? createLogger({ job: "recover" });
+  const now = (deps.now?.() ?? new Date()).getTime();
+  const before = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
+  const stuck = [
+    ...(await deps.projects.listStuck(
+      RUNNING.filter((s) => s !== "animating"),
+      before(LIMITS.stuckJobMinutes),
+      100,
+    )),
+    ...(await deps.projects.listStuck(["animating"], before(LIMITS.stuckAnimateMinutes), 100)),
+  ];
+  for (const p of stuck) {
+    await deps.projects.updateProject(p.id, { status: "failed", current_stage: null, error: STOPPED_ERROR });
+  }
+  if (stuck.length) log.warn("marked stopped videos as failed", { count: stuck.length });
+  return stuck.length;
+}
+
+/**
+ * Called when BullMQ gives up on a job outside our handler (e.g. it stalled because the
+ * worker stopped). Marks the project failed if it still looks busy.
+ */
+export async function markJobFailed(data: JobData, error: string, deps: WorkerDeps): Promise<void> {
+  if (data.type === "cleanup") return;
+  const row = await deps.projects.getProject(data.projectId);
+  if (!row || !(ACTIVE_STATUSES as readonly string[]).includes(row.status)) return;
+  await deps.projects.updateProject(row.id, {
+    status: "failed",
+    current_stage: null,
+    error: /stall/i.test(error) ? STOPPED_ERROR : error.split("\n")[0]!.slice(0, 500),
+  });
+}
+
 /** Spec §8: delete outputs and working files 48 h after a video was rendered. */
 export async function runCleanup(deps: WorkerDeps): Promise<number> {
   const log = deps.log ?? createLogger({ job: "cleanup" });
@@ -297,6 +342,7 @@ export async function runCleanup(deps: WorkerDeps): Promise<number> {
 
 export async function handleJob(data: JobData, deps: WorkerDeps): Promise<void> {
   if (data.type === "cleanup") {
+    await recoverStuckProjects(deps);
     await runCleanup(deps);
     return;
   }
