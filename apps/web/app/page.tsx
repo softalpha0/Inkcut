@@ -17,7 +17,7 @@ const STEPS = [
   },
   {
     title: "Voice, drawings, captions",
-    body: "Every scene gets a natural AI voice, an illustration in your chosen style and word-by-word captions.",
+    body: "Every scene gets a natural AI voice, an illustration drawn with Pollinations AI in your chosen style, and word-by-word captions.",
     pose: "walk" as const,
   },
   {
@@ -367,6 +367,20 @@ export default function Landing() {
       <footer className="border-t-2 border-ink bg-white">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-6 text-sm text-muted sm:flex-row">
           <Logo />
+          <a
+            href="https://pollinations.ai/?ref=badge"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 hover:text-ink"
+            title="Illustrations and thumbnails are generated with Pollinations AI"
+          >
+            <img
+              src="https://raw.githubusercontent.com/pollinations/pollinations/main/packages/ui/src/brand/badge-made-with.svg"
+              alt="Made with pollinations.ai"
+              height={20}
+              className="h-5 w-auto"
+            />
+          </a>
           <p>© {new Date().getFullYear()} Inkcut. Videos are yours to post anywhere.</p>
         </div>
       </footer>

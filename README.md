@@ -1,5 +1,7 @@
 # Inkcut
 
+[![Made with pollinations.ai](https://raw.githubusercontent.com/pollinations/pollinations/main/packages/ui/src/brand/badge-made-with.svg)](https://pollinations.ai/?ref=badge)
+
 Turn a topic, a script or your own voiceover into a narrated cartoon explainer video (MP4): stickman, flat cartoon, whiteboard, storybook and more, or a style you describe.
 Free to use, with daily limits. See [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md) for scope and architecture.
 
@@ -19,6 +21,20 @@ topic ─SERV─▶ script ─SERV─▶ scenes ─Edge TTS─▶ voice ─Polli
 | `packages/pipeline` | The video pipeline and the local CLI                                          |
 | `packages/shared`   | Schemas, limits, job types shared by everything                               |
 | `packages/db`       | SQL migration and Supabase helpers                                            |
+
+## Built with Pollinations
+
+Every illustration in an Inkcut video, and every YouTube thumbnail picture, is generated with the
+[Pollinations](https://pollinations.ai) API. Live app: https://inkcut-web.onrender.com
+
+| What                                      | Pollinations endpoint                                                      | Source                                                                                         |
+| ----------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Scene illustrations (one per scene)       | `GET https://gen.pollinations.ai/image/{prompt}?model=…&width&height&seed` | [`packages/pipeline/src/images/pollinations.ts`](packages/pipeline/src/images/pollinations.ts) |
+| Thumbnail pictures (3 per video)          | same image endpoint, 16:9                                                  | [`packages/pipeline/src/stages/thumbnail.ts`](packages/pipeline/src/stages/thumbnail.ts)       |
+| Optional scene animation (image-to-video) | `media.pollinations.ai/upload`, `GET /video/{prompt}`, `GET /v1/jobs/{id}` | [`packages/pipeline/src/video/pollinations.ts`](packages/pipeline/src/video/pollinations.ts)   |
+| Shared client (auth, errors, retries)     | Bearer `sk_` key                                                           | [`packages/pipeline/src/pollinations/client.ts`](packages/pipeline/src/pollinations/client.ts) |
+
+The live app runs with `IMAGE_PROVIDER=pollinations` and a `POLLINATIONS_API_KEY` (see `.env.example`).
 
 ---
 
