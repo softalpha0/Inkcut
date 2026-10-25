@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import type { WordTiming } from "@inkcut/shared";
@@ -5,6 +6,7 @@ import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import type { Logger } from "../util/log.js";
 import type { ApiCallCounter } from "../util/metrics.js";
 import { errorMessage, withRetry } from "../util/retry.js";
+import { SEC_MS_GEC_VERSION, TRUSTED_CLIENT_TOKEN, generateSecMsGec } from "./edge-drm.js";
 import type { TtsProvider, TtsResult } from "./types.js";
 
 /** Edge reports offsets in 100-nanosecond ticks. */
@@ -36,6 +38,36 @@ export function parseEdgeWordBoundaries(metadata: { Metadata?: EdgeMetadataItem[
   }
   return words.sort((a, b) => a.start - b.start);
 }
+
+export const EDGE_WSS_URL = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1";
+
+/** Same endpoint and token as python edge-tts 7.3.1. */
+export function edgeSynthUrl(unixSeconds: number, connectionId: string): string {
+  return (
+    `${EDGE_WSS_URL}?TrustedClientToken=${TRUSTED_CLIENT_TOKEN}&ConnectionId=${connectionId}` +
+    `&Sec-MS-GEC=${generateSecMsGec(unixSeconds)}&Sec-MS-GEC-Version=${SEC_MS_GEC_VERSION}`
+  );
+}
+
+/** msedge-tts internals this module replaces (private in its types). */
+interface MsEdgeTtsStatics {
+  getSynthUrl?: () => Promise<string>;
+  _clockOffsetMs?: number;
+}
+
+/**
+ * msedge-tts 2.1.0 (latest) still uses the old token and endpoint, which
+ * Microsoft now answers with HTTP 200 instead of a WebSocket. Swap in the v2
+ * URL builder; the library's own clock-skew correction still applies.
+ * Remove once msedge-tts ships the v2 token.
+ */
+function useV2Token(): void {
+  const statics = MsEdgeTTS as unknown as MsEdgeTtsStatics;
+  if (typeof statics.getSynthUrl !== "function") return;
+  statics.getSynthUrl = async () =>
+    edgeSynthUrl((Date.now() + (statics._clockOffsetMs ?? 0)) / 1000, randomUUID().replace(/-/g, ""));
+}
+useV2Token();
 
 /**
  * Microsoft Edge "Read Aloud" voices via msedge-tts (free, no key).
